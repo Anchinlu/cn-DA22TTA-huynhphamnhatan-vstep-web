@@ -1,46 +1,30 @@
 import React, { useState } from 'react';
-import { Lock, Mail, Eye, EyeOff, User, Phone, UserPlus } from 'lucide-react';
-
-const RegisterMascot = () => (
-  <div className="hidden lg:flex lg:w-1/2 items-center justify-center relative p-12">
-    <div className="absolute inset-0 flex items-center justify-center">
-      <div className="absolute h-96 w-96 rounded-full bg-gradient-to-br from-green-300 to-blue-400 opacity-20 animate-pulse-slow" />
-      <div className="absolute h-80 w-80 rounded-full bg-gradient-to-br from-green-400 to-blue-500 opacity-40 animate-pulse" style={{ animationDelay: '1s' }} />
-      <div className="relative h-64 w-64 rounded-full bg-gradient-to-br from-green-500 to-blue-600 flex items-center justify-center shadow-2xl">
-        <UserPlus className="w-24 h-24 text-white" />
-      </div>
-    </div>
-    
-    <div className="relative z-10 text-center mt-[30rem]">
-      <h2 className="text-3xl font-bold text-gray-800">Tham gia cùng chúng tôi!</h2>
-      <p className="mt-4 text-lg text-gray-600">
-        Tạo tài khoản để bắt đầu luyện tập và theo dõi tiến độ của bạn.
-      </p>
-    </div>
-  </div>
-);
-
+import { User, Mail, Lock, CheckCircle } from 'lucide-react';
+import AuthLayout from '../components/AuthLayout';
+import AuthInput from '../components/AuthInput';
 
 const DangKy = () => {
+  const [formData, setFormData] = useState({
+    ho_ten: '', email: '', mat_khau: '', confirmPassword: ''
+  });
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    ho_ten: '',
-    email: '',
-    phone: '',
-    mat_khau: '',
-    confirmPassword: '',
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Hàm kiểm tra độ mạnh mật khẩu (chỉ để hiển thị UI cho đẹp)
+  const getPasswordStrength = (pass) => {
+    if (!pass) return 0;
+    let score = 0;
+    if (pass.length >= 8) score++;
+    if (/[A-Z]/.test(pass)) score++;
+    if (/[0-9]/.test(pass)) score++;
+    if (/[^A-Za-z0-9]/.test(pass)) score++;
+    return score; 
+  };
+  const strength = getPasswordStrength(formData.mat_khau);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prevState => ({
-      ...prevState,
-      [name]: value
-    }));
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
@@ -49,20 +33,17 @@ const DangKy = () => {
     setError(null);
     setSuccess(null);
 
-    // 1. Validation 
     if (formData.mat_khau !== formData.confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp!');
+      setError("Mật khẩu xác nhận không khớp");
       setLoading(false);
       return;
     }
 
     try {
-      // 2. Gọi API ( backend chỉ lấy ho_ten, email, mat_khau)
+      // Logic cũ: Gọi API đăng ký
       const response = await fetch('http://localhost:5000/api/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           ho_ten: formData.ho_ten, 
           email: formData.email, 
@@ -71,17 +52,10 @@ const DangKy = () => {
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Có lỗi xảy ra');
-      }
-
-      // === Đăng ký thành công ===
-      setSuccess("Tạo tài khoản thành công! Đang chuyển bạn đến trang đăng nhập...");
-      
-      setTimeout(() => {
-        window.location.href = '/dang-nhap';
-      }, 2000);
+      setSuccess("Đăng ký thành công! Đang chuyển hướng...");
+      setTimeout(() => { window.location.href = '/dang-nhap'; }, 1500);
 
     } catch (err) {
       setError(err.message);
@@ -91,210 +65,63 @@ const DangKy = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 p-4 animate-fade-in">
-      <div className="flex w-full max-w-6xl overflow-hidden">
+    <AuthLayout title="Tạo tài khoản" subtitle="Bắt đầu hành trình chinh phục VSTEP">
+      <form onSubmit={handleSubmit}>
         
-        {/* === 2.1 Mascot Section (Trái) === */}
-        <RegisterMascot />
+        <AuthInput 
+          label="Họ và tên" icon={User} name="ho_ten"
+          value={formData.ho_ten} onChange={handleChange} required
+        />
 
-        {/* === 2.2 Form Section (Phải) === */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center">
-          <div 
-            className="w-full max-w-md transform rounded-3xl bg-white p-8 shadow-2xl transition-all duration-500 hover:shadow-3xl md:p-10 animate-slide-up"
-            style={{ animationDelay: '0.2s' }}
-          >
-            {/* Form Header */}
-            <div className="mb-8 text-center lg:text-left">
-              <h1 className="text-3xl font-bold text-gray-800">Đăng Ký</h1>
-              <p className="mt-2 text-gray-500">Tạo tài khoản mới của bạn</p>
+        <AuthInput 
+          label="Email" icon={Mail} type="email" name="email"
+          value={formData.email} onChange={handleChange} required
+        />
+
+        <div className="mb-2">
+          <AuthInput 
+            label="Mật khẩu" icon={Lock} type="password" name="mat_khau"
+            value={formData.mat_khau} onChange={handleChange} required
+          />
+          {/* Thanh độ mạnh mật khẩu (UI Only) */}
+          {formData.mat_khau && (
+            <div className="flex gap-1 h-1 mt-[-10px] mb-4 px-1">
+              {[1,2,3,4].map(i => (
+                <div key={i} className={`flex-1 rounded-full transition-colors duration-300 
+                  ${i <= strength ? (strength < 2 ? 'bg-red-500' : strength < 4 ? 'bg-yellow-500' : 'bg-green-500') : 'bg-gray-200'}`} 
+                />
+              ))}
             </div>
-
-            {/* Form */}
-            <form className="space-y-5" onSubmit={handleSubmit}>
-              
-              {/* Full Name Input */}
-              <div>
-                <label 
-                  htmlFor="ho_ten" 
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Họ và tên
-                </label>
-                <div className="relative mt-2">
-                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <User className="h-5 w-5 text-gray-400" />
-                  </span>
-                  <input
-                    id="ho_ten"
-                    name="ho_ten"
-                    type="text"
-                    autoComplete="name"
-                    required
-                    className="block w-full rounded-xl border border-gray-300 py-3 pl-10 pr-3 text-gray-900 shadow-sm transition duration-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nhập họ và tên đầy đủ"
-                    value={formData.ho_ten}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              {/* Email Input */}
-              <div>
-                <label 
-                  htmlFor="email" 
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Email
-                </label>
-                <div className="relative mt-2">
-                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <Mail className="h-5 w-5 text-gray-400" />
-                  </span>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    className="block w-full rounded-xl border border-gray-300 py-3 pl-10 pr-3 text-gray-900 shadow-sm transition duration-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nhập email của bạn"
-                    value={formData.email}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              {/* Phone Input */}
-              <div>
-                <label 
-                  htmlFor="phone" 
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Số điện thoại
-                </label>
-                <div className="relative mt-2">
-                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <Phone className="h-5 w-5 text-gray-400" />
-                  </span>
-                  <input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    autoComplete="tel"
-                    className="block w-full rounded-xl border border-gray-300 py-3 pl-10 pr-3 text-gray-900 shadow-sm transition duration-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Nhập số điện thoại (Không bắt buộc)"
-                    value={formData.phone}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              {/* Password Input */}
-              <div>
-                <label 
-                  htmlFor="password" 
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Mật khẩu
-                </label>
-                <div className="relative mt-2">
-                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <Lock className="h-5 w-5 text-gray-400" />
-                  </span>
-                  <input
-                    id="password"
-                    name="mat_khau"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    required
-                    className="block w-full rounded-xl border border-gray-300 py-3 pl-10 pr-10 text-gray-900 shadow-sm transition duration-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="••••••••••••"
-                    value={formData.mat_khau}
-                    onChange={handleChange}
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer text-gray-400 hover:text-gray-600"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Confirm Password Input */}
-              <div>
-                <label 
-                  htmlFor="confirmPassword" 
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Xác nhận mật khẩu
-                </label>
-                <div className="relative mt-2">
-                  <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <Lock className="h-5 w-5 text-gray-400" />
-                  </span>
-                  <input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    required
-                    className="block w-full rounded-xl border border-gray-300 py-3 pl-10 pr-10 text-gray-900 shadow-sm transition duration-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="••••••••••••"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer text-gray-400 hover:text-gray-600"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Thông báo Lỗi / Thành công  */}
-              {error && (
-                <div className="text-center text-sm font-medium text-red-600">
-                  {error}
-                </div>
-              )}
-              {success && (
-                <div className="text-center text-sm font-medium text-green-600">
-                  {success}
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`flex w-full justify-center rounded-xl bg-gradient-to-r from-green-500 to-blue-600 
-                             py-3 px-4 text-base font-bold text-white shadow-lg transition-all 
-                             duration-300 ease-in-out hover:shadow-xl hover:scale-[1.02] 
-                             active:scale-[0.98] 
-                             ${loading ? 'cursor-not-allowed opacity-50' : ''}`}
-                >
-                  {loading ? 'Đang xử lý...' : 'Tạo tài khoản'}
-                </button>
-              </div>
-            </form>
-
-            {/* Login Link */}
-            <p className="mt-8 text-center text-sm text-gray-600">
-              Đã có tài khoản?{' '}
-              <a href="/dang-nhap" className="font-bold text-blue-600 hover:text-blue-700">
-                Đăng nhập
-              </a>
-            </p>
-
-          </div>
+          )}
         </div>
-      </div>
-    </div>
+
+        <AuthInput 
+          label="Xác nhận mật khẩu" icon={CheckCircle} type="password" name="confirmPassword"
+          value={formData.confirmPassword} onChange={handleChange} required
+          error={formData.confirmPassword && formData.mat_khau !== formData.confirmPassword ? "Mật khẩu không khớp" : null}
+        />
+
+        {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded text-center">{error}</div>}
+        {success && <div className="mb-4 p-3 bg-green-50 text-green-600 text-sm rounded text-center">{success}</div>}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className={`w-full py-3.5 rounded-lg text-white font-bold text-lg shadow-md transition-all duration-300
+            ${loading ? 'bg-gray-400' : 'bg-primary hover:bg-primary-dark hover:-translate-y-0.5'}
+          `}
+        >
+          {loading ? 'Đang xử lý...' : 'Đăng Ký'}
+        </button>
+
+        <p className="mt-8 text-center text-sm text-gray-600">
+          Đã có tài khoản?{' '}
+          <a href="/dang-nhap" className="font-bold text-primary hover:underline">
+            Đăng nhập ngay
+          </a>
+        </p>
+      </form>
+    </AuthLayout>
   );
 };
 
