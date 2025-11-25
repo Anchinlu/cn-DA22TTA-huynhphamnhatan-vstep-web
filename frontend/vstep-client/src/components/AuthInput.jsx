@@ -25,8 +25,7 @@ const AuthInput = ({ label, icon: Icon, type = 'text', error, ...props }) => {
           className="w-full px-3 pt-5 pb-2 bg-transparent outline-none text-gray-900 font-medium text-base placeholder-transparent z-10"
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder={label} // Cần placeholder để trick CSS hoạt động nếu dùng pure CSS, ở đây dùng JS control
-          {...props}
+          placeholder={label} 
         />
 
         {/* Label Floating */}
