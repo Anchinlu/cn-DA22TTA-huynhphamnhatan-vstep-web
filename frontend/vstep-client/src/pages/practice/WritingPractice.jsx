@@ -64,39 +64,58 @@ const WritingPractice = () => {
     return `${m}:${sec < 10 ? '0' : ''}${sec}`;
   };
 
-  // 4. Xử lý Nộp bài & Chấm điểm AI
+  // 4. Xử lý Nộp bài & Chấm điểm AI (và lưu kết quả vào DB)
   const handleSubmit = async () => {
     if (!essay.trim() || wordCount < 10) {
-      alert("Bài viết quá ngắn. Hãy viết thêm trước khi nộp!");
+      alert("Bài viết quá ngắn.");
       return;
     }
 
     if(window.confirm("Nộp bài để AI chấm điểm ngay?")) {
       setIsSubmitted(true);
-      setIsGrading(true); // Bật loading
+      setIsGrading(true);
 
       try {
+        // 1. Gọi AI chấm điểm
         const response = await fetch('http://localhost:5000/api/writing/grade', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            topic: testData?.title,
-            essay: essay,
-            level: level
-          })
+          body: JSON.stringify({ topic: testData?.title, essay: essay, level: level })
         });
-
         const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Lỗi chấm điểm');
         
-        if (!response.ok) throw new Error(data.message || "Lỗi chấm điểm");
-        
-        setGradingResult(data);
+        setGradingResult(data); // Hiển thị kết quả
+
+        // === 2. LƯU KẾT QUẢ VÀO DB (MỚI) ===
+        const token = localStorage.getItem('vstep_token');
+        if (token) {
+          try {
+            await fetch('http://localhost:5000/api/results', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                skill: 'writing',
+                level: level,
+                score: data.score,
+                duration: (task === '1' ? 20 * 60 : 40 * 60) - timeLeft
+              })
+            });
+            console.log('Đã lưu điểm Writing vào DB');
+          } catch (err) {
+            console.warn('Không lưu được kết quả vào DB:', err.message);
+          }
+        }
+        // ====================================
 
       } catch (error) {
-        alert("Lỗi kết nối với AI: " + error.message);
+        alert("Lỗi: " + error.message);
         setIsSubmitted(false);
       } finally {
-        setIsGrading(false); // Tắt loading
+        setIsGrading(false);
       }
     }
   };

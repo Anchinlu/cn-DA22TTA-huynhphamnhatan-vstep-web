@@ -70,3 +70,17 @@ body {
   }
   
 }
+/* --- SỬA LỖI AUTOFILL (Dán vào cuối file index.css) --- */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px white inset !important; /* Ép nền trắng */
+    -webkit-text-fill-color: #111827 !important; /* Ép chữ đen */
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Đảm bảo input luôn có chữ màu đen */
+input {
+    color: #111827 !important; 
+}
