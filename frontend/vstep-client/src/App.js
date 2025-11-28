@@ -25,6 +25,9 @@ import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
 import AdminLayout from './layouts/AdminLayout';
 import AdminDashboard from './pages/admin/Dashboard';
+import UserManagement from './pages/admin/UserManagement.jsx';
+import ClassManagement from './pages/admin/ClassManagement.jsx';
+import ClassDetail from './pages/ClassDetail.jsx';
 
 function App() {
   return (
@@ -49,6 +52,7 @@ function App() {
           <Route path="/practice/speaking/test" element={<SpeakingPractice />} />
           <Route path="/join-class" element={<JoinClass />} />
           <Route path="/my-courses" element={<MyCourses />} />
+          <Route path="/class/:id" element={<ClassDetail />} />
         
         </Route>
 
@@ -56,7 +60,8 @@ function App() {
         <Route element={<AdminRoute />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
-            {/* Nơi thêm các trang CRUD quản trị (users, classes, ...) */}
+            <Route path="users" element={<UserManagement />} />
+            <Route path="classes" element={<ClassManagement />} />
           </Route>
         </Route>
 

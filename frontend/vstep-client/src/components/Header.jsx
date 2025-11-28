@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   BookOpen, Search, Menu, X, User, LogOut,
-  LayoutDashboard, School, BookMarked // Icon mới cho Khóa học của tôi
+  LayoutDashboard, School, BookMarked, 
+  PlusCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,12 +11,16 @@ const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Chuyển hướng sang trang Khóa học của tôi
   const handleMyCourses = () => {
     navigate('/my-courses');
+  };
+  
+  const handleJoinClass = () => {
+    navigate('/join-class');
   };
 
   useEffect(() => {
@@ -49,10 +54,20 @@ const Header = () => {
     { name: 'Từ điển', href: '/dictionary' },
   ];
 
-  const managementLinks = [
-    { name: 'Lớp học', href: '/class', icon: School },
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  ];
+  // === THAY ĐỔI: Hàm lấy menu quản trị theo vai trò ===
+  const getManagementLinks = (roleId) => {
+    // Link mặc định cho cả GV và Admin
+    const links = [
+      { name: 'Trang Quản lý', href: '/admin', icon: LayoutDashboard }
+    ];
+
+    // Chỉ GIÁO VIÊN (ID 2) mới thấy menu Lớp học ở Header
+    if (roleId === 2) {
+      links.push({ name: 'Lớp học', href: '/admin/classes', icon: School });
+    }
+
+    return links;
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-100 transition-all duration-300">
@@ -83,13 +98,15 @@ const Header = () => {
                 </a>
               ))}
 
+              {/* HIỂN THỊ MENU QUẢN TRỊ (Dynamic theo Role) */}
               {currentUser && (currentUser.vaiTroId === 2 || currentUser.vaiTroId === 3) && (
-                managementLinks.map((item) => (
+                getManagementLinks(currentUser.vaiTroId).map((item) => (
                   <a
                     key={item.name}
                     href={item.href}
-                    className="px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-full transition-all flex items-center gap-1"
+                    className="px-4 py-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800 rounded-full transition-all flex items-center gap-1.5 border border-indigo-100"
                   >
+                    <item.icon className="w-4 h-4" />
                     {item.name}
                   </a>
                 ))
@@ -98,7 +115,7 @@ const Header = () => {
             
             <div className="h-6 w-px bg-gray-200" />
 
-            {/* === THAY ĐỔI: Nút "Khóa học của tôi" === */}
+            {/* Nút "Khóa học của tôi" (Chỉ Học viên) */}
             {currentUser && currentUser.vaiTroId === 1 && (
                <button 
                   onClick={handleMyCourses}
@@ -109,7 +126,7 @@ const Header = () => {
                </button>
             )}
 
-            {/* Search & User Dropdown (Giữ nguyên) */}
+            {/* Search Icon */}
             {isSearchOpen ? (
               <div className="relative flex items-center transition-all duration-300 ease-in-out animate-fade-in">
                 <input
@@ -127,6 +144,7 @@ const Header = () => {
               </button>
             )}
 
+            {/* User Dropdown */}
             <div className="relative ml-2">
               {currentUser ? (
                 <div>
@@ -145,11 +163,19 @@ const Header = () => {
                         </span>
                       </div>
                       
-                      {/* Link cá nhân */}
                       <a href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-xl transition-colors">Thông tin tài khoản</a>
+                      
+                      {/* Link riêng cho Học viên */}
                       {currentUser.vaiTroId === 1 && (
                         <a href="/my-courses" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-xl transition-colors font-medium text-blue-600">
                           Khóa học của tôi
+                        </a>
+                      )}
+
+                      {/* Link riêng cho Giáo viên/Admin */}
+                      {(currentUser.vaiTroId === 2 || currentUser.vaiTroId === 3) && (
+                        <a href="/admin" className="block px-4 py-2 text-sm text-indigo-700 hover:bg-indigo-50 rounded-xl transition-colors font-bold">
+                          Vào trang Quản trị
                         </a>
                       )}
 
@@ -176,30 +202,39 @@ const Header = () => {
         </div>
       </div>
       
-      {/* Mobile Menu Drawer (Giữ nguyên logic cũ, chỉ cập nhật nút tham gia) */}
+      {/* MOBILE MENU DRAWER */}
       {isMobileMenuOpen && (
         <div className="lg:hidden bg-white border-t border-gray-100 shadow-lg absolute w-full h-screen z-40">
           <div className="space-y-1 px-4 pt-4 pb-6">
-             {/* ... (Giữ nguyên phần map baseLinks) ... */}
              {baseLinks.map((item) => (
               <a key={item.name} href={item.href} className="block rounded-xl px-4 py-3 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700">{item.name}</a>
              ))}
+
+             {/* Mobile: Menu Quản trị (Dynamic) */}
+             {currentUser && (currentUser.vaiTroId === 2 || currentUser.vaiTroId === 3) && (
+               getManagementLinks(currentUser.vaiTroId).map((item) => (
+                <a key={item.name} href={item.href} className="flex items-center gap-2 rounded-xl px-4 py-3 text-base font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 mb-1">
+                  <item.icon className="w-5 h-5"/> {item.name}
+                </a>
+              ))
+             )}
 
              {/* Mobile: Khóa học của tôi */}
              {currentUser && currentUser.vaiTroId === 1 && (
                <button
                   onClick={() => { setIsMobileMenuOpen(false); navigate('/my-courses'); }}
-                  className="w-full text-left block rounded-xl px-4 py-3 text-base font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100"
+                  className="w-full text-left flex items-center gap-2 rounded-xl px-4 py-3 text-base font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-100"
                 >
-                  <BookMarked className="w-5 h-5 inline-block mr-2" /> Khóa học của tôi
+                  <BookMarked className="w-5 h-5" /> Khóa học của tôi
                 </button>
              )}
-             {/* ... (Phần User Info & Logout giữ nguyên) ... */}
+
              <div className="border-t border-gray-100 my-4"></div>
+             {/* ... (Phần User Info & Logout giữ nguyên) ... */}
              {currentUser ? (
                 <div className="px-4">
                   <div className="flex items-center gap-3 mb-6 bg-gray-50 p-3 rounded-xl">
-                    <img className="h-12 w-12 rounded-full" src={`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.hoTen)}&background=0D8ABC&color=fff`} alt={currentUser.hoTen} />
+                    <img className="h-12 w-12 rounded-full border border-white shadow-sm" src={`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.hoTen)}&background=0D8ABC&color=fff`} alt={currentUser.hoTen} />
                     <div><div className="text-base font-bold text-gray-900">{currentUser.hoTen}</div><div className="text-xs text-gray-500">{currentUser.email}</div></div>
                   </div>
                   <button onClick={handleLogout} className="flex w-full items-center justify-center rounded-xl border border-red-200 bg-white px-4 py-3 text-base font-bold text-red-600 hover:bg-red-50 shadow-sm">

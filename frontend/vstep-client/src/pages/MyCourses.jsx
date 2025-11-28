@@ -11,37 +11,102 @@ import Footer from '../components/Footer';
 
 // --- SUB-COMPONENTS (Giao diện con) ---
 
-// 1. Tab Lớp học (Hiện tại chưa có API lớp học -> Hiển thị Empty State đẹp)
-const MyClassesTab = ({ navigate }) => (
-  <div className="animate-fade-in">
-    <div className="flex justify-between items-center mb-6">
-      <h3 className="text-xl font-bold text-gray-800">Lớp học của tôi</h3>
-      <button 
-        onClick={() => navigate('/join-class')}
-        className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-blue-700 shadow-md transition-all hover:-translate-y-0.5"
-      >
-        <Plus className="w-5 h-5" /> Tham gia lớp mới
-      </button>
-    </div>
+// Component Tab 1: Lớp học của tôi (Lấy dữ liệu thật từ API)
+const MyClassesTab = ({ navigate }) => {
+  const [classes, setClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-    {/* Empty State cho Lớp học */}
-    <div className="bg-white rounded-3xl border-2 border-dashed border-gray-200 p-12 text-center">
-      <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
-        <Layout className="w-10 h-10" />
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        const token = localStorage.getItem('vstep_token');
+        const res = await fetch('http://localhost:5000/api/student/classes', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok) setClasses(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchClasses();
+  }, []);
+
+  if (loading) return <div className="p-12 text-center text-gray-500"><Loader2 className="w-8 h-8 animate-spin mx-auto mb-2"/>Đang tải lớp học...</div>;
+
+  return (
+    <div className="animate-fade-in">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-xl font-bold text-gray-800">Lớp học đang tham gia</h3>
+        <button 
+          onClick={() => navigate('/join-class')}
+          className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-blue-700 shadow-md transition-all hover:-translate-y-0.5"
+        >
+          <Plus className="w-5 h-5" /> Tham gia lớp mới
+        </button>
       </div>
-      <h4 className="text-lg font-bold text-gray-900 mb-2">Chưa tham gia lớp học nào</h4>
-      <p className="text-gray-500 max-w-md mx-auto mb-8">
-        Hãy tham gia lớp học do giáo viên tổ chức để nhận bài tập và lộ trình học tập bài bản.
-      </p>
-      <button 
-        onClick={() => navigate('/join-class')}
-        className="px-6 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors"
-      >
-        Nhập mã lớp ngay
-      </button>
+
+      {classes.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {classes.map((cls) => (
+            <div key={cls.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                  <BookOpen className="w-6 h-6" />
+                </div>
+                {/* === SỬA ĐOẠN NÀY: HIỂN THỊ TRẠNG THÁI === */}
+                {cls.trang_thai === 'approved' ? (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full uppercase flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3"/> Đang học
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full uppercase flex items-center gap-1 animate-pulse">
+                    <Clock className="w-3 h-3"/> Chờ duyệt
+                  </span>
+                )}
+                {/* ========================================= */}
+              </div>
+              <h4 className="text-lg font-bold text-gray-900 mb-1">{cls.ten_lop}</h4>
+              <p className="text-sm text-gray-500 mb-4">GV: {cls.giao_vien} • Mã: {cls.ma_lop}</p>
+              
+              <button 
+                disabled={cls.trang_thai !== 'approved'}
+                onClick={() => navigate(`/class/${cls.id}`)}
+                className={`w-full py-2 text-sm font-bold rounded-lg transition-colors
+                  ${cls.trang_thai === 'approved' 
+                    ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' 
+                    : 'text-gray-400 bg-gray-100 cursor-not-allowed'}
+                `}
+              >
+                {cls.trang_thai === 'approved' ? 'Vào lớp học' : 'Đang chờ giáo viên...'}
+                
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* Empty State (Giữ nguyên như cũ) */
+        <div className="bg-white rounded-3xl border-2 border-dashed border-gray-200 p-12 text-center">
+          <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Layout className="w-10 h-10" />
+          </div>
+          <h4 className="text-lg font-bold text-gray-900 mb-2">Chưa tham gia lớp học nào</h4>
+          <p className="text-gray-500 max-w-md mx-auto mb-8">
+            Hãy tham gia lớp học do giáo viên tổ chức để nhận bài tập và lộ trình học tập bài bản.
+          </p>
+          <button 
+            onClick={() => navigate('/join-class')}
+            className="px-6 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            Nhập mã lớp ngay
+          </button>
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 // 2. Tab Lịch sử (Dữ liệu thật từ API)
 const HistoryTab = ({ historyData }) => {

@@ -13,23 +13,42 @@ const JoinClass = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleJoin = (e) => {
+  const handleJoin = async (e) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    // Giả lập gọi API kiểm tra mã lớp
-    setTimeout(() => {
-      if (classCode.length < 5) {
-        setError("Mã lớp học không hợp lệ (ít nhất 5 ký tự).");
-        setLoading(false);
-      } else {
-        // Thành công (Giả định)
-        alert(`Đã gửi yêu cầu tham gia lớp: ${classCode}`);
-        setLoading(false);
-        // navigate('/class/detail'); // Sau này sẽ chuyển hướng
+    try {
+      const token = localStorage.getItem('vstep_token');
+      if (!token) {
+        navigate('/dang-nhap');
+        return;
       }
-    }, 1000);
+
+      const response = await fetch('http://localhost:5000/api/classes/join', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ ma_lop: classCode })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Có lỗi xảy ra');
+      }
+
+      // Thành công
+      alert(data.message);
+      navigate('/my-courses');
+
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
