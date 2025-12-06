@@ -28,6 +28,7 @@ import AdminDashboard from './pages/admin/Dashboard';
 import UserManagement from './pages/admin/UserManagement.jsx';
 import ClassManagement from './pages/admin/ClassManagement.jsx';
 import ClassDetail from './pages/ClassDetail.jsx';
+import AssignmentDetail from './pages/admin/AssignmentDetail.jsx';
 
 function App() {
   return (
@@ -62,6 +63,7 @@ function App() {
             <Route index element={<AdminDashboard />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="classes" element={<ClassManagement />} />
+            <Route path="assignment/:id" element={<AssignmentDetail />} />
           </Route>
         </Route>
 
