@@ -24,7 +24,6 @@ app.use(cors());
 app.use(express.json());
 
 // [QUAN TRỌNG] Cấu hình phục vụ file tĩnh (Audio/Image)
-// Đặt lên đầu để ưu tiên xử lý file
 app.use(express.static(path.join(__dirname, '../public'))); 
 
 // --- KẾT NỐI DATABASE (MySQL Connection Pool) ---
@@ -152,23 +151,70 @@ app.delete("/api/users/:id", async (req, res) => {
 // 3. CLASSROOM SYSTEM (Quản lý Lớp học)
 // ============================================================
 
-// [TEACHER] Tạo lớp
+// [TEACHER] Tạo lớp học mới
 app.post("/api/classes", async (req, res) => {
   try {
     const token = req.headers['authorization']?.split(' ')[1];
-    if (!token) return res.status(401).json({ message: "Unauthorized" });
     const decoded = jwt.verify(token, JWT_SECRET);
-    
-    if (decoded.vaiTroId !== 2 && decoded.vaiTroId !== 3) return res.status(403).json({ message: "Forbidden" });
-
     const { ten_lop, mo_ta } = req.body;
+
     const ma_lop = "VS" + Math.floor(1000 + Math.random() * 9000);
+
+    // Insert đúng cột giao_vien_id
+    await pool.query(
+      "INSERT INTO lop_hoc (ten_lop, ma_lop, mo_ta, giao_vien_id) VALUES (?, ?, ?, ?)",
+      [ten_lop, ma_lop, mo_ta, decoded.userId]
+    );
+
+    res.json({ message: "Tạo lớp thành công!", ma_lop });
+  } catch (err) { 
+    console.error(err);
+    res.status(500).json({ message: "Lỗi tạo lớp" }); 
+  }
+});
+
+// [ADMIN/TEACHER] Lấy danh sách lớp học
+app.get("/api/classes", async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
     
-    await pool.query("INSERT INTO lop_hoc (ten_lop, ma_lop, giao_vien_id, mo_ta) VALUES (?, ?, ?, ?)", 
-      [ten_lop, ma_lop, decoded.userId, mo_ta]);
-    
-    res.status(201).json({ message: "Tạo lớp thành công!", ma_lop });
-  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const roleId = parseInt(decoded.vaiTroId); 
+    const userId = decoded.userId;
+
+    console.log(`[API Classes] User: ${userId}, Role: ${roleId}`);
+
+    let sql = "";
+    let params = [];
+
+    if (roleId === 3) {
+      // === ADMIN: Lấy tất cả lớp ===
+      sql = `
+        SELECT lh.*, nd.ho_ten as giao_vien_ten,
+        (SELECT COUNT(*) FROM thanh_vien_lop WHERE lop_hoc_id = lh.id) as si_so
+        FROM lop_hoc lh
+        LEFT JOIN nguoi_dung nd ON lh.giao_vien_id = nd.user_id 
+        ORDER BY lh.ngay_tao DESC`;
+    } else {
+      // === GIÁO VIÊN: Lấy lớp của mình ===
+      sql = `
+        SELECT lh.*, 
+        (SELECT COUNT(*) FROM thanh_vien_lop WHERE lop_hoc_id = lh.id) as si_so
+        FROM lop_hoc lh
+        WHERE lh.giao_vien_id = ? 
+        ORDER BY lh.ngay_tao DESC`;
+      params = [userId];
+    }
+
+    const [rows] = await pool.query(sql, params);
+    console.log(`-> Tìm thấy: ${rows.length} lớp.`);
+    res.json(rows);
+
+  } catch (err) {
+    console.error("Lỗi SQL:", err);
+    res.status(500).json({ message: "Lỗi Server: " + err.message });
+  }
 });
 
 // [TEACHER] Lấy danh sách lớp
@@ -279,6 +325,46 @@ app.post("/api/classes/:id/assignments", async (req, res) => {
   } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
 });
 
+// [TEACHER] Cập nhật thông tin lớp (Mô tả)
+app.put("/api/classes/:id", async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+    
+    const { mo_ta, ten_lop } = req.body;
+    await pool.query("UPDATE lop_hoc SET mo_ta = ?, ten_lop = ? WHERE id = ?", [mo_ta, ten_lop, req.params.id]);
+    res.json({ message: "Cập nhật thành công!" });
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+// [COMMON] Lấy danh sách tài liệu của lớp
+app.get("/api/classes/:id/documents", async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM tai_lieu_lop WHERE lop_hoc_id = ? ORDER BY ngay_tao DESC", [req.params.id]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+// [TEACHER] Thêm tài liệu mới
+app.post("/api/classes/:id/documents", async (req, res) => {
+  try {
+    const { ten_tai_lieu, duong_dan, loai_file } = req.body;
+    await pool.query(
+      "INSERT INTO tai_lieu_lop (lop_hoc_id, ten_tai_lieu, duong_dan, loai_file) VALUES (?, ?, ?, ?)",
+      [req.params.id, ten_tai_lieu, duong_dan, loai_file]
+    );
+    res.json({ message: "Đã thêm tài liệu!" });
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+// [TEACHER] Xóa tài liệu
+app.delete("/api/documents/:docId", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM tai_lieu_lop WHERE id = ?", [req.params.docId]);
+    res.json({ message: "Đã xóa tài liệu" });
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
 // [TEACHER] Lấy danh sách bài nộp
 app.get("/api/assignments/:id/submissions", async (req, res) => {
   try {
@@ -290,6 +376,20 @@ app.get("/api/assignments/:id/submissions", async (req, res) => {
   } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
 });
 
+// [STUDENT/TEACHER] Lấy chi tiết 1 bài tập (Kèm cấu hình)
+app.get("/api/assignments/:id", async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+    
+    // Lấy chi tiết bài tập
+    const [rows] = await pool.query("SELECT * FROM bai_tap WHERE id = ?", [req.params.id]);
+    
+    if (rows.length === 0) return res.status(404).json({ message: "Không tìm thấy bài tập" });
+    res.json(rows[0]);
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
 // [TEACHER] Chấm điểm bài nộp
 app.post("/api/submissions/:id/grade", async (req, res) => {
   try {
@@ -298,6 +398,60 @@ app.post("/api/submissions/:id/grade", async (req, res) => {
     await pool.query("UPDATE bai_nop SET diem = ?, nhan_xet = ?, trang_thai_cham = 'da_cham' WHERE bai_nop_id = ?", [diem, nhan_xet, id]);
     res.status(200).json({ message: "Đã chấm!" });
   } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+// [STUDENT] 
+app.get("/api/assignments/:id/my-submission", async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const { id } = req.params; 
+    const sql = `SELECT * FROM bai_nop WHERE bai_tap_id = ? AND user_id = ?`;
+    const [rows] = await pool.query(sql, [id, decoded.userId]);
+    
+    res.json(rows[0] || null); 
+  } catch (err) { console.error(err); res.status(500).json({ message: "Lỗi server" }); }
+});
+
+// [STUDENT] Nộp bài tập
+app.post("/api/assignments/:id/submit", async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const baiTapId = req.params.id;
+    const { link_nop_bai } = req.body; 
+
+    console.log("Submit Info:", { userId: decoded.userId, baiTapId, link: link_nop_bai });
+
+    // 1. Kiểm tra xem đã nộp chưa
+    const [check] = await pool.query(
+      "SELECT bai_nop_id FROM bai_nop WHERE bai_tap_id = ? AND user_id = ?", 
+      [baiTapId, decoded.userId]
+    );
+
+    if (check.length > 0) {
+        // 2. Nếu có rồi -> UPDATE
+        await pool.query(
+          "UPDATE bai_nop SET link_nop_bai = ?, ngay_nop = NOW() WHERE bai_nop_id = ?", 
+          [link_nop_bai, check[0].bai_nop_id]
+        );
+        res.json({ message: "Cập nhật bài nộp thành công!" });
+    } else {
+        // 3. Nếu chưa -> INSERT
+        await pool.query(
+            "INSERT INTO bai_nop (bai_tap_id, user_id, link_nop_bai, ngay_nop, trang_thai_cham) VALUES (?, ?, ?, NOW(), 'chua_cham')",
+            [baiTapId, decoded.userId, link_nop_bai]
+        );
+        res.json({ message: "Nộp bài thành công!" });
+    }
+  } catch (err) {
+    console.error("SQL Error chi tiết:", err); 
+    res.status(500).json({ message: "Lỗi Server: " + (err.sqlMessage || err.message) });
+  }
 });
 
 
@@ -312,10 +466,111 @@ app.get("/api/slideshow", async (req, res) => {
   } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
 });
 
-app.get("/api/reading/test", async (req, res) => {
+// ===================================
+// LISTENING APIS (Đã cập nhật)
+// ===================================
+
+app.get("/api/listening/test", async (req, res) => {
+  try {
+    const { level, topic, id } = req.query;
+    let sql = "";
+    let params = [];
+
+    if (id) {
+      // TRƯỜNG HỢP 1: Lấy đề cụ thể theo ID
+      sql = "SELECT * FROM listening_audios WHERE id = ?";
+      params = [id];
+    } else {
+      // TRƯỜNG HỢP 2: Lấy ngẫu nhiên
+      sql = "SELECT * FROM listening_audios WHERE level_id = ? AND topic_id = ? ORDER BY RAND() LIMIT 1";
+      params = [level, topic];
+    }
+
+    const [audios] = await pool.query(sql, params);
+    
+    // Fallback: Nếu không tìm thấy, lấy ngẫu nhiên 1 bài
+    if (audios.length === 0 && !id) {
+       const [rand] = await pool.query("SELECT * FROM listening_audios ORDER BY RAND() LIMIT 1");
+       if (rand.length > 0) audios.push(rand[0]);
+    }
+
+    if (audios.length === 0) return res.status(404).json({ message: "Chưa có bài nghe." });
+    
+    const audio = audios[0];
+    const [questions] = await pool.query("SELECT * FROM listening_questions WHERE audio_id = ?", [audio.id]);
+    
+    const formatted = questions.map(q => ({
+      id: q.id, question: q.question_text,
+      options: [`A. ${q.option_a}`, `B. ${q.option_b}`, `C. ${q.option_c}`, `D. ${q.option_d}`],
+      correct: q.correct_answer, explanation: q.explanation
+    }));
+    
+    res.status(200).json({ ...audio, questions: formatted });
+
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+app.get("/api/listening/list", async (req, res) => {
   try {
     const { level, topic } = req.query;
-    const [passages] = await pool.query("SELECT * FROM reading_passages WHERE level_id = ? AND topic_id = ? ORDER BY RAND() LIMIT 1", [level, topic]);
+    const sql = "SELECT id, title, duration FROM listening_audios WHERE level_id = ? AND topic_id = ?";
+    const [rows] = await pool.query(sql, [level, topic]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+app.get("/api/listening/history", async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json([]);
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const sql = `SELECT id, diem_so, thoi_gian_lam, ngay_lam, tieu_de_bai_thi FROM lich_su_lam_bai WHERE user_id = ? AND ky_nang = 'listening' ORDER BY ngay_lam DESC LIMIT 10`;
+    const [rows] = await pool.query(sql, [decoded.userId]);
+    
+    const formatted = rows.map(r => ({
+      ...r,
+      ngay_lam: new Date(r.ngay_lam).toLocaleDateString('vi-VN') + ' ' + new Date(r.ngay_lam).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})
+    }));
+    
+    res.json(formatted);
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+// ===================================
+// READING APIS
+// ===================================
+
+app.get("/api/reading/list", async (req, res) => {
+  try {
+    const { level, topic } = req.query;
+    const sql = "SELECT id, title FROM reading_passages WHERE level_id = ? AND topic_id = ?";
+    const [rows] = await pool.query(sql, [level, topic]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+app.get("/api/reading/test", async (req, res) => {
+  try {
+    const { level, topic, id } = req.query;
+    let sql = "";
+    let params = [];
+
+    if (id) {
+        sql = "SELECT * FROM reading_passages WHERE id = ?";
+        params = [id];
+    } else {
+        sql = "SELECT * FROM reading_passages WHERE level_id = ? AND topic_id = ? ORDER BY RAND() LIMIT 1";
+        params = [level, topic];
+    }
+
+    const [passages] = await pool.query(sql, params);
+    
+    if (passages.length === 0 && !id) {
+        const [rand] = await pool.query("SELECT * FROM reading_passages ORDER BY RAND() LIMIT 1");
+        if(rand.length > 0) passages.push(rand[0]);
+    }
+
     if (passages.length === 0) return res.status(404).json({ message: "Chưa có bài đọc." });
 
     const passage = passages[0];
@@ -330,87 +585,208 @@ app.get("/api/reading/test", async (req, res) => {
   } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
 });
 
-app.get("/api/listening/test", async (req, res) => {
-    try {
-        const { level, topic } = req.query;
-        let sql = "SELECT * FROM listening_audios WHERE level_id = ? AND topic_id = ? ORDER BY RAND() LIMIT 1";
-        // Fallback random nếu không có topic
-        const [check] = await pool.query(sql, [level, topic]);
-        const [audios] = await pool.query(check.length ? sql : "SELECT * FROM listening_audios ORDER BY RAND() LIMIT 1", check.length ? [level, topic] : []);
-        
-        if (audios.length === 0) return res.status(404).json({ message: "Chưa có bài nghe." });
-        const audio = audios[0];
-        const [questions] = await pool.query("SELECT * FROM listening_questions WHERE audio_id = ?", [audio.id]);
-        
-        const formatted = questions.map(q => ({
-            id: q.id, question: q.question_text,
-            options: [`A. ${q.option_a}`, `B. ${q.option_b}`, `C. ${q.option_c}`, `D. ${q.option_d}`],
-            correct: q.correct_answer, explanation: q.explanation
-        }));
-        res.status(200).json({ ...audio, questions: formatted });
-    } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+app.get("/api/reading/history", async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json([]);
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const sql = `SELECT id, diem_so, thoi_gian_lam, ngay_lam, tieu_de_bai_thi FROM lich_su_lam_bai WHERE user_id = ? AND ky_nang = 'reading' ORDER BY ngay_lam DESC LIMIT 10`;
+    const [rows] = await pool.query(sql, [decoded.userId]);
+    
+    const formatted = rows.map(r => ({
+      ...r,
+      ngay_lam: new Date(r.ngay_lam).toLocaleDateString('vi-VN') + ' ' + new Date(r.ngay_lam).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})
+    }));
+    
+    res.json(formatted);
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
 });
 
+// ===================================
+// WRITING APIS (MỚI NÂNG CẤP)
+// ===================================
+
+// 1. Lấy danh sách đề Writing theo Task & Topic (Cho Dashboard)
+app.get("/api/writing/list", async (req, res) => {
+  try {
+    const { level, topic, task } = req.query;
+    
+    let sql = "SELECT id, title, task_type FROM writing_prompts WHERE level_id = ? AND topic_id = ?";
+    let params = [level, topic];
+
+    if (task && task !== 'all') {
+        sql += " AND task_type = ?";
+        params.push(task);
+    }
+
+    const [rows] = await pool.query(sql, params);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+// 2. Lấy chi tiết đề Writing (Hỗ trợ ID)
 app.get("/api/writing/test", async (req, res) => {
     try {
-        const { level, topic, task } = req.query;
-        let sql = "SELECT * FROM writing_prompts WHERE level_id = ? AND topic_id = ?";
-        const params = [level, topic];
-        if (task) { sql += " AND task_type = ?"; params.push(task); }
-        sql += " ORDER BY RAND() LIMIT 1";
+        const { id } = req.query; // Ưu tiên lấy theo ID
+        
+        let sql = "SELECT * FROM writing_prompts WHERE id = ?";
+        let params = [id];
+
+        // Nếu không có ID, fallback lấy random (để giữ code cũ chạy)
+        if (!id) {
+            sql = "SELECT * FROM writing_prompts ORDER BY RAND() LIMIT 1";
+            params = [];
+        }
         
         const [prompts] = await pool.query(sql, params);
-        if (prompts.length === 0) {
-            const [rand] = await pool.query("SELECT * FROM writing_prompts ORDER BY RAND() LIMIT 1");
-            return res.status(200).json(rand[0] || {});
-        }
+        if (prompts.length === 0) return res.status(404).json({ message: "Không tìm thấy đề bài." });
+        
         res.status(200).json(prompts[0]);
     } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
 });
 
-app.get("/api/speaking/test", async (req, res) => {
+// 3. Lấy lịch sử Writing
+app.get("/api/writing/history", async (req, res) => {
   try {
-    const { part } = req.query;
-    let sql = "SELECT * FROM speaking_questions WHERE part = ? ORDER BY RAND() LIMIT 1";
-    const [questions] = await pool.query(sql, [part]);
-    if(questions.length === 0) {
-        const [rand] = await pool.query("SELECT * FROM speaking_questions ORDER BY RAND() LIMIT 1");
-        return res.status(200).json(rand[0] || {});
-    }
-    res.status(200).json(questions[0]);
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json([]);
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const sql = `
+      SELECT id, diem_so, thoi_gian_lam, ngay_lam, tieu_de_bai_thi, bai_lam_text, ai_feedback
+      FROM lich_su_lam_bai 
+      WHERE user_id = ? AND ky_nang = 'writing' 
+      ORDER BY ngay_lam DESC LIMIT 10`;
+      
+    const [rows] = await pool.query(sql, [decoded.userId]);
+    
+    const formatted = rows.map(r => ({
+      ...r,
+      ngay_lam: new Date(r.ngay_lam).toLocaleDateString('vi-VN') + ' ' + new Date(r.ngay_lam).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})
+    }));
+    
+    res.json(formatted);
   } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
 });
 
+// ===================================
+// SPEAKING APIS (MỚI BỔ SUNG)
+// ===================================
+
+// 1. Lấy danh sách câu hỏi Speaking (Sửa lỗi 404)
+app.get("/api/speaking/list", async (req, res) => {
+  try {
+    const { part, topic } = req.query;
+    let sql = "SELECT id, title, part FROM speaking_questions WHERE 1=1";
+    let params = [];
+    if (part) { sql += " AND part = ?"; params.push(part); }
+    if (topic && topic !== 'all') { sql += " AND topic_id = ?"; params.push(topic); }
+    
+    const [rows] = await pool.query(sql, params);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+// 2. Lấy chi tiết đề Speaking
+app.get("/api/speaking/test", async (req, res) => {
+  try {
+    const { id, part } = req.query; // Thêm part để fallback
+    let sql = "";
+    let params = [];
+
+    if (id) {
+        sql = "SELECT * FROM speaking_questions WHERE id = ?";
+        params = [id];
+    } else {
+        // Fallback: Lấy ngẫu nhiên theo part
+        sql = "SELECT * FROM speaking_questions WHERE part = ? ORDER BY RAND() LIMIT 1";
+        params = [part || 1];
+    }
+    
+    const [rows] = await pool.query(sql, params);
+    if(rows.length === 0) return res.status(404).json({ message: "Không tìm thấy đề nói." });
+    res.json(rows[0]);
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+// 3. Lấy lịch sử Speaking (Sửa lỗi 404)
+app.get("/api/speaking/history", async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1]; if(!token) return res.json([]);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const sql = `SELECT id, diem_so, thoi_gian_lam, ngay_lam, tieu_de_bai_thi, bai_lam_text, ai_feedback FROM lich_su_lam_bai WHERE user_id = ? AND ky_nang = 'speaking' ORDER BY ngay_lam DESC LIMIT 10`;
+    const [rows] = await pool.query(sql, [decoded.userId]);
+    res.json(rows.map(r => ({...r, ngay_lam: new Date(r.ngay_lam).toLocaleDateString('vi-VN')})));
+  } catch (err) { res.status(500).json({ message: "Err" }); }
+});
+
 // ============================================================
-// 5. AI INTEGRATION (REST API - GEMINI 2.0 FLASH)
+// 5. AI INTEGRATION (GROQ - LLAMA 3.3)
 // ============================================================
 
-// Helper: Gọi Google REST API
+// Helper: Gọi Groq AI
 async function callGemini(prompt) {
-  if (!process.env.GEMINI_API_KEY) throw new Error("Thiếu API Key");
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+  const key = process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY; 
   
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-  });
-
-  if (!response.ok) {
-     const errData = await response.json();
-     throw new Error(errData.error?.message || "Lỗi Google API");
+  if (!key) {
+      console.error("❌ Thiếu GROQ_API_KEY trong file .env");
+      return { 
+          word: "Lỗi Config", 
+          meaning_vi: "Chưa cấu hình Key Groq", 
+          description: "Vui lòng kiểm tra file .env", 
+          examples: [] 
+      };
   }
 
-  const data = await response.json();
-  let text = data.candidates[0].content.parts[0].text;
+  const url = "https://api.groq.com/openai/v1/chat/completions";
   
-  // Clean JSON
-  text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-  if (text.indexOf('{') > -1) text = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
-  
-  return JSON.parse(text);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${key}`
+      },
+      body: JSON.stringify({ 
+        model: "llama-3.3-70b-versatile", 
+        messages: [
+          { role: "system", content: "You are a helpful JSON assistant. You must output valid JSON only. No markdown." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.3,
+        response_format: { type: "json_object" } 
+      })
+    });
+
+    if (!response.ok) {
+       const errData = await response.json();
+       console.error("❌ Groq API Error:", JSON.stringify(errData, null, 2));
+       throw new Error("Lỗi kết nối AI (Groq)");
+    }
+
+    const data = await response.json();
+    let text = data.choices?.[0]?.message?.content || "{}";
+    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    
+    return JSON.parse(text);
+
+  } catch (error) {
+    console.error("❌ AI Crash:", error.message);
+    return { word: "Error", meaning_vi: "Hệ thống đang bận", description: "Vui lòng thử lại sau.", examples: [] };
+  }
 }
+
+// API: Chấm điểm Speaking (Dựa trên văn bản Speech-to-Text)
+app.post("/api/speaking/grade", async (req, res) => {
+  try {
+    const { topic, transcript, part } = req.body; 
+    if (!transcript || transcript.length < 5) return res.status(400).json({ message: "Chưa nghe rõ." });
+    const prompt = `Act as VSTEP Examiner. Grade Speaking Part ${part}. Q: "${topic}". Ans: "${transcript}". Return JSON: { "score": number(0-10), "comment": "Vietnamese", "better_response": "English", "vocabulary_suggestions": ["words"] }`;
+    const result = await callGemini(prompt);
+    res.status(200).json(result);
+  } catch (err) { res.status(500).json({ message: "Lỗi AI." }); }
+});
 
 // API: Chấm điểm Writing (AI)
 app.post("/api/writing/grade", async (req, res) => {
@@ -418,11 +794,21 @@ app.post("/api/writing/grade", async (req, res) => {
     const { topic, essay, level } = req.body;
     if (!essay || essay.length < 10) return res.status(400).json({ message: "Bài viết quá ngắn." });
 
-    console.log("🤖 AI Grading...");
-    const prompt = `Act as VSTEP Examiner. Grade level ${level}. Topic: ${topic}. Essay: "${essay}". Return JSON ONLY: { "score": "...", "comment": "...", "corrections": [], "suggestion": "..." }`;
+    console.log("🤖 AI Grading (Groq)...");
+    const prompt = `Act as VSTEP Examiner. Grade this essay for Level ${level}. 
+    Topic: "${topic}". 
+    Essay: "${essay}". 
+    
+    Return JSON ONLY: { 
+        "score": number (0-10), 
+        "comment": "General feedback (Vietnamese)", 
+        "corrections": ["list of specific errors and fixes"], 
+        "suggestion": "How to improve (Vietnamese)" 
+    }`;
     
     const result = await callGemini(prompt);
     res.status(200).json(result);
+
   } catch (err) { 
     console.error("AI Error:", err.message);
     res.status(500).json({ message: "Lỗi chấm điểm.", detail: err.message }); 
@@ -433,95 +819,77 @@ app.post("/api/writing/grade", async (req, res) => {
 app.post("/api/dictionary/lookup", async (req, res) => {
   try {
     const { word } = req.body;
-    const prompt = `Dictionary lookup for "${word}". Return JSON ONLY: { "word": "${word}", "phonetic": "...", "type": "...", "meaning_vi": "...", "description": "...", "examples": [{"en": "...", "vi": "..."}], "synonyms": [] }`;
+    const prompt = `Dictionary lookup for "${word}". Return JSON ONLY: { "word": "${word}", "phonetic": "string", "type": "string", "meaning_vi": "string (vietnamese)", "description": "string (english definition)", "examples": [{"en": "string", "vi": "string"}], "synonyms": ["string"] }`;
     
     const result = await callGemini(prompt);
     res.status(200).json(result);
-  } catch (err) { res.status(500).json({ message: "Lỗi tra từ." }); }
+  } catch (err) { 
+    res.status(500).json({ message: "Lỗi tra từ." }); 
+  }
 });
 
-// === 13. API AI GIẢI THÍCH CÂU HỎI ===
+// API: Giải thích câu hỏi (AI) - CÓ CONTEXT
 app.post("/api/ai/explain", async (req, res) => {
   try {
-    const { question, options, correct, userAnswer } = req.body;
-
-    if (!process.env.GEMINI_API_KEY) return res.status(500).json({ message: "Thiếu API Key." });
-
-    console.log("🤖 AI đang phân tích và giải thích...");
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    const { question, options, correct, userAnswer, context } = req.body;
+    
     const prompt = `
-      Bạn là một giáo viên luyện thi tiếng Anh VSTEP chuyên nghiệp, tận tâm và giải thích cực kỳ dễ hiểu cho người Việt.
-      Hãy giải thích câu hỏi trắc nghiệm sau đây:
-
+      Bạn là giáo viên VSTEP. Dựa vào nội dung bài đọc dưới đây để giải thích câu hỏi:
+      --- CONTEXT ---
+      "${context || 'Không có bài đọc'}"
+      ---------------
+      Giải thích câu hỏi này cho người Việt:
       - Câu hỏi: "${question}"
       - Các lựa chọn: ${JSON.stringify(options)}
-      - Đáp án đúng là: ${correct}
-      ${userAnswer ? `- Học viên đã chọn: ${userAnswer}` : ""}
-
-      Yêu cầu trả về kết quả dưới dạng JSON (Không Markdown, không lời dẫn) theo cấu trúc sau:
-      {
-        "translation": "Dịch câu hỏi và 4 đáp án sang tiếng Việt sát nghĩa.",
-        "explanation": "Giải thích chi tiết bằng Tiếng Việt. Bắt buộc phải trích dẫn (quote) câu tiếng Anh trong bài đọc chứa thông tin trả lời, sau đó dịch câu đó ra và giải thích tại sao nó dẫn đến đáp án đúng. Giải thích ngắn gọn tại sao các phương án còn lại sai (nếu là bẫy).",
-        "key_vocabulary": ["từ vựng 1 (loại từ): nghĩa tiếng việt", "từ vựng 2: nghĩa"]
-      }
+      - Đáp án đúng: ${correct}
+      
+      Trả về JSON: { "translation": "Dịch câu hỏi/đáp án", "explanation": "Giải thích chi tiết dựa trên bài đọc", "key_vocabulary": ["từ vựng: nghĩa"] }
     `;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
-      })
-    });
-
-    if (!response.ok) {
-       const errData = await response.json();
-       throw new Error(errData.error?.message || "Lỗi Google API");
-    }
-
-    const data = await response.json();
     
-    // Kiểm tra dữ liệu trả về
-    if (!data.candidates || !data.candidates[0].content) {
-        throw new Error("AI không phản hồi.");
-    }
-
-    let text = data.candidates[0].content.parts[0].text;
-
-    // Clean JSON
-    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    if (text.indexOf('{') > -1) text = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
-
-    res.status(200).json(JSON.parse(text));
-
-  } catch (err) {
-    console.error("Lỗi AI Explain:", err.message);
-    res.status(500).json({ message: "AI đang bận, vui lòng thử lại." });
+    const result = await callGemini(prompt);
+    res.status(200).json(result);
+  } catch (err) { 
+    res.status(500).json({ message: "Lỗi AI Explain." }); 
   }
 });
 
 // ============================================================
-// 6. USER HISTORY (Lịch sử làm bài)
+// 6. USER HISTORY & RESULTS (CẬP NHẬT LƯU BÀI VIẾT)
 // ============================================================
 
 app.post("/api/results", async (req, res) => {
   try {
     const token = req.headers['authorization']?.split(' ')[1];
     if (!token) return res.status(401).json({ message: "Unauthorized" });
-    const decoded = jwt.verify(token, JWT_SECRET); // Dùng đúng JWT_SECRET
+    const decoded = jwt.verify(token, JWT_SECRET); 
     
-    const { skill, level, score, duration } = req.body; 
-    const sql = "INSERT INTO lich_su_lam_bai (user_id, ky_nang, trinh_do, diem_so, thoi_gian_lam) VALUES (?, ?, ?, ?, ?)";
-    await pool.query(sql, [decoded.userId, skill, level, score, duration]);
+    // Nhận thêm bai_lam_text và ai_feedback
+    const { skill, level, score, duration, testTitle, bai_lam_text, ai_feedback } = req.body; 
+
+    const sql = `INSERT INTO lich_su_lam_bai 
+        (user_id, ky_nang, trinh_do, diem_so, thoi_gian_lam, tieu_de_bai_thi, bai_lam_text, ai_feedback, ngay_lam) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+    
+    // Lưu các trường mới vào DB (nếu là null thì DB tự hiểu)
+    await pool.query(sql, [
+        decoded.userId, skill, level, score, duration, 
+        testTitle || 'Bài luyện tập', 
+        bai_lam_text || null, 
+        ai_feedback ? JSON.stringify(ai_feedback) : null // Lưu JSON dưới dạng string
+    ]);
+
     res.status(201).json({ message: "Saved!" });
-  } catch (err) { res.status(500).json({ message: "Lỗi lưu điểm." }); }
+  } catch (err) { 
+      console.error(err);
+      res.status(500).json({ message: "Lỗi lưu điểm." }); 
+  }
 });
 
 app.get("/api/results/history", async (req, res) => {
   try {
     const token = req.headers['authorization']?.split(' ')[1];
     if (!token) return res.status(401).json({ message: "Unauthorized" });
-    const decoded = jwt.verify(token, JWT_SECRET); // Dùng đúng JWT_SECRET
+    const decoded = jwt.verify(token, JWT_SECRET); 
     
     const sql = "SELECT * FROM lich_su_lam_bai WHERE user_id = ? ORDER BY ngay_lam DESC LIMIT 20";
     const [history] = await pool.query(sql, [decoded.userId]);
@@ -532,6 +900,116 @@ app.get("/api/results/history", async (req, res) => {
     }));
     res.status(200).json(formatted);
   } catch (err) { res.status(500).json({ message: "Lỗi server." }); }
+});
+
+// ============================================================
+// 7. DASHBOARD & STATISTICS
+// ============================================================
+
+app.get("/api/dashboard/stats", async (req, res) => {
+   try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.userId;
+    const roleId = decoded.vaiTroId; 
+
+   let stats = {
+      totalClasses: 0, totalStudents: 0, pendingStudents: 0,
+      totalAssignments: 0, upcomingDeadlines: [], totalTeachers: 0, recentUsers: []
+    };
+
+     if (roleId === 2) { 
+       const [classes] = await pool.query("SELECT COUNT(*) as count FROM lop_hoc WHERE giao_vien_id = ?", [userId]);
+       stats.totalClasses = classes[0].count;
+
+      const [students] = await pool.query(`SELECT COUNT(*) as count FROM thanh_vien_lop tv JOIN lop_hoc lh ON tv.lop_hoc_id = lh.id WHERE lh.giao_vien_id = ? AND tv.trang_thai = 'approved'`, [userId]);
+      stats.totalStudents = students[0].count;
+
+      const [pending] = await pool.query(`SELECT COUNT(*) as count FROM thanh_vien_lop tv JOIN lop_hoc lh ON tv.lop_hoc_id = lh.id WHERE lh.giao_vien_id = ? AND tv.trang_thai = 'pending'`, [userId]);
+      stats.pendingStudents = pending[0].count;
+
+      const [assigns] = await pool.query(`SELECT COUNT(*) as count FROM bai_tap bt JOIN lop_hoc lh ON bt.lop_hoc_id = lh.id WHERE lh.giao_vien_id = ?`, [userId]);
+      stats.totalAssignments = assigns[0].count;
+
+      const [deadlines] = await pool.query(`SELECT bt.id, bt.tieu_de, bt.han_nop, lh.ma_lop FROM bai_tap bt JOIN lop_hoc lh ON bt.lop_hoc_id = lh.id WHERE lh.giao_vien_id = ? AND bt.han_nop >= CURDATE() ORDER BY bt.han_nop ASC LIMIT 5`, [userId]);
+      stats.upcomingDeadlines = deadlines;
+
+    } else if (roleId === 3) { // ADMIN
+      const [c] = await pool.query("SELECT COUNT(*) as count FROM lop_hoc");
+      const [u] = await pool.query("SELECT COUNT(*) as count FROM nguoi_dung WHERE vai_tro_id = 1");
+      const [t] = await pool.query("SELECT COUNT(*) as count FROM nguoi_dung WHERE vai_tro_id = 2");
+      const [recent] = await pool.query("SELECT user_id as id, ho_ten, email, vai_tro_id, ngay_tao FROM nguoi_dung ORDER BY ngay_tao DESC LIMIT 5");
+
+      stats.totalClasses = c[0].count;
+      stats.totalStudents = u[0].count;
+      stats.totalTeachers = t[0].count; 
+      stats.recentUsers = recent;       
+    }
+
+    res.json(stats);
+
+  } catch (err) {
+    console.error(err);
+      res.status(500).json({ message: "Lỗi lấy thống kê" });
+ }
+});
+// ============================================================
+// 8. PROFILE & USER STATS (MỚI THÊM)
+// ============================================================
+
+// API: Lấy thống kê chi tiết cho trang Profile
+app.get("/api/profile/stats", async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.userId;
+
+    // 1. Lấy thông tin User cơ bản
+    const [users] = await pool.query("SELECT ho_ten, email, ngay_tao FROM nguoi_dung WHERE user_id = ?", [userId]);
+    const user = users[0];
+
+    // 2. Tính toán thống kê từ lịch sử làm bài
+    const sqlStats = `
+      SELECT 
+        COUNT(*) as total_tests,
+        AVG(diem_so) as overall_avg,
+        SUM(thoi_gian_lam) as total_time,
+        SUM(CASE WHEN ky_nang = 'listening' THEN 1 ELSE 0 END) as listening_count,
+        AVG(CASE WHEN ky_nang = 'listening' THEN diem_so ELSE NULL END) as listening_avg,
+        SUM(CASE WHEN ky_nang = 'reading' THEN 1 ELSE 0 END) as reading_count,
+        AVG(CASE WHEN ky_nang = 'reading' THEN diem_so ELSE NULL END) as reading_avg,
+        SUM(CASE WHEN ky_nang = 'writing' THEN 1 ELSE 0 END) as writing_count,
+        AVG(CASE WHEN ky_nang = 'writing' THEN diem_so ELSE NULL END) as writing_avg,
+        SUM(CASE WHEN ky_nang = 'speaking' THEN 1 ELSE 0 END) as speaking_count,
+        AVG(CASE WHEN ky_nang = 'speaking' THEN diem_so ELSE NULL END) as speaking_avg
+      FROM lich_su_lam_bai 
+      WHERE user_id = ?
+    `;
+    const [stats] = await pool.query(sqlStats, [userId]);
+    
+    // 3. Lấy 5 bài làm gần nhất
+    const [recent] = await pool.query(`
+        SELECT id, ky_nang, tieu_de_bai_thi, diem_so, ngay_lam 
+        FROM lich_su_lam_bai 
+        WHERE user_id = ? 
+        ORDER BY ngay_lam DESC LIMIT 5
+    `, [userId]);
+
+    res.json({
+      user: user,
+      stats: stats[0],
+      recent_activity: recent.map(r => ({
+          ...r,
+          ngay_lam: new Date(r.ngay_lam).toLocaleDateString('vi-VN')
+      }))
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Lỗi lấy Profile" });
+  }
 });
 
 // KHỞI ĐỘNG SERVER

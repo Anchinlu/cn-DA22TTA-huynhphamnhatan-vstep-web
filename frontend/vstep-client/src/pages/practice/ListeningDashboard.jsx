@@ -1,76 +1,248 @@
-import React, { useState } from 'react';
-import { Headphones, ArrowLeft, ArrowRight, BookOpen, Coffee, Globe } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Header from '../../components/Header.jsx';
-import Footer from '../../components/Footer.jsx';
+import { 
+  Headphones, Clock, BarChart3, PlayCircle, 
+  CheckCircle2, History, ChevronRight 
+} from 'lucide-react';
+import Header from '../../components/Header';
+import Footer from '../../components/Footer';
 
 const ListeningDashboard = () => {
   const navigate = useNavigate();
-  const [level, setLevel] = useState('B1');
-  const [topic, setTopic] = useState('daily_life');
+  
+  // State quản lý bộ lọc
+  const [selectedLevel, setSelectedLevel] = useState('B1');
+  const [selectedTopic, setSelectedTopic] = useState('daily_life');
+  
+  // Data từ API
+  const [tests, setTests] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const handleStart = () => {
-    navigate('/practice/listening/test', { state: { level, topic } });
+  // Danh sách chủ đề cố định (Hoặc có thể fetch từ DB nếu muốn)
+  const topics = [
+    { id: 'daily_life', name: 'Đời sống thường ngày', icon: '☕' },
+    { id: 'education', name: 'Giáo dục & Học tập', icon: '📚' },
+    { id: 'travel', name: 'Du lịch & Văn hóa', icon: '🌍' },
+    { id: 'technology', name: 'Khoa học & Công nghệ', icon: '💻' },
+  ];
+
+  // 1. Fetch danh sách đề khi chọn Level/Topic
+  useEffect(() => {
+    const fetchTests = async () => {
+      setLoading(true);
+      try {
+        // Gọi API lấy danh sách đề
+        const res = await fetch(`http://localhost:5000/api/listening/list?level=${selectedLevel}&topic=${selectedTopic}`);
+        if(res.ok) {
+            const data = await res.json();
+            setTests(data); 
+        } else {
+            setTests([]); // Không có đề
+        }
+      } catch (error) {
+        console.error("Lỗi tải đề:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTests();
+  }, [selectedLevel, selectedTopic]);
+
+  // 2. Fetch lịch sử làm bài
+  useEffect(() => {
+    const fetchHistory = async () => {
+        const token = localStorage.getItem('vstep_token');
+        if(!token) return;
+        try {
+            const res = await fetch(`http://localhost:5000/api/listening/history`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if(res.ok) setHistory(await res.json());
+        } catch (e) { console.error(e); }
+    };
+    fetchHistory();
+  }, []);
+
+  // Xử lý khi chọn đề để thi
+  const handleStartTest = (testId) => {
+    // Chuyển sang trang làm bài (ListeningPractice) kèm theo ID cụ thể
+    // Cần cập nhật ListeningPractice để nhận testId này thay vì random
+    navigate('/practice/listening/start', { state: { level: selectedLevel, topic: selectedTopic, testId: testId } });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 font-sans flex flex-col">
       <Header />
-      <main className="flex-grow pt-24 pb-10 px-4">
-        <div className="max-w-4xl mx-auto">
-           <button onClick={() => navigate('/luyen-thi')} className="flex items-center text-gray-500 hover:text-blue-600 mb-6 transition">
-            <ArrowLeft className="w-5 h-5 mr-2" /> Quay lại
-          </button>
-
-          <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
-            <div className="bg-blue-600 p-10 text-white text-center relative overflow-hidden">
-                <Headphones className="w-24 h-24 absolute -bottom-4 -right-4 text-blue-500 opacity-50 rotate-12" />
-                <h1 className="text-3xl font-bold relative z-10">Luyện Nghe VSTEP</h1>
-                <p className="text-blue-100 mt-2 relative z-10">Cải thiện kỹ năng nghe hiểu qua các bài tập thực tế</p>
+      
+      <main className="flex-grow pt-24 pb-12 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* --- CỘT TRÁI: BỘ LỌC & DANH SÁCH ĐỀ (2/3) --- */}
+          <div className="lg:col-span-2 space-y-8">
+            
+            {/* 1. Header Section */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
+                <div className="relative z-10">
+                    <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+                        <Headphones className="w-8 h-8"/> Luyện Nghe VSTEP
+                    </h1>
+                    <p className="text-blue-100 opacity-90 max-w-lg">
+                        Chọn trình độ và chủ đề phù hợp để bắt đầu luyện tập. Hệ thống sẽ lưu lại tiến độ của bạn.
+                    </p>
+                </div>
+                {/* Decoration */}
+                <div className="absolute right-0 bottom-0 opacity-10">
+                    <Headphones size={150} />
+                </div>
             </div>
 
-            <div className="p-8">
-              {/* Chọn Level */}
-              <div className="mb-8">
-                <label className="block text-gray-700 font-bold mb-3">1. Chọn trình độ</label>
-                <div className="grid grid-cols-3 gap-4">
-                  {['B1', 'B2', 'C1'].map((l) => (
-                    <button 
-                      key={l}
-                      onClick={() => setLevel(l)}
-                      className={`py-3 rounded-xl border-2 font-bold transition-all ${
-                        level === l 
-                        ? 'border-blue-600 bg-blue-50 text-blue-600' 
-                        : 'border-gray-100 hover:border-gray-300 text-gray-500'
-                      }`}
-                    >
-                      {l}
-                    </button>
-                  ))}
+            {/* 2. Bộ lọc Trình độ & Chủ đề */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 className="font-bold text-gray-800 mb-4">1. Chọn trình độ mục tiêu</h3>
+                <div className="grid grid-cols-3 gap-4 mb-8">
+                    {['B1', 'B2', 'C1'].map(level => (
+                        <button 
+                            key={level}
+                            onClick={() => setSelectedLevel(level)}
+                            className={`py-3 rounded-xl font-bold transition-all border-2 ${
+                                selectedLevel === level 
+                                ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm' 
+                                : 'border-gray-100 text-gray-500 hover:border-gray-300'
+                            }`}
+                        >
+                            {level}
+                        </button>
+                    ))}
                 </div>
-              </div>
 
-              {/* Chọn Topic */}
-              <div className="mb-8">
-                <label className="block text-gray-700 font-bold mb-3">2. Chọn chủ đề</label>
-                <div className="grid grid-cols-2 gap-4">
-                  <button onClick={() => setTopic('daily_life')} className={`flex items-center p-4 rounded-xl border-2 transition-all ${topic === 'daily_life' ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-100 hover:bg-gray-50'}`}>
-                    <Coffee className="w-6 h-6 mr-3" /> Đời sống thường ngày
-                  </button>
-                  <button onClick={() => setTopic('education')} className={`flex items-center p-4 rounded-xl border-2 transition-all ${topic === 'education' ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-100 hover:bg-gray-50'}`}>
-                    <BookOpen className="w-6 h-6 mr-3" /> Giáo dục & Học tập
-                  </button>
-                  <button onClick={() => setTopic('travel')} className={`flex items-center p-4 rounded-xl border-2 transition-all ${topic === 'travel' ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-100 hover:bg-gray-50'}`}>
-                    <Globe className="w-6 h-6 mr-3" /> Du lịch & Văn hóa
-                  </button>
+                <h3 className="font-bold text-gray-800 mb-4">2. Chọn chủ đề luyện tập</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {topics.map(t => (
+                        <button
+                            key={t.id}
+                            onClick={() => setSelectedTopic(t.id)}
+                            className={`p-4 rounded-xl text-left transition-all border ${
+                                selectedTopic === t.id
+                                ? 'border-blue-500 ring-1 ring-blue-500 bg-white shadow-md'
+                                : 'border-gray-200 hover:bg-gray-50'
+                            }`}
+                        >
+                            <span className="text-xl mr-3">{t.icon}</span>
+                            <span className={`font-medium ${selectedTopic === t.id ? 'text-blue-700' : 'text-gray-700'}`}>
+                                {t.name}
+                            </span>
+                        </button>
+                    ))}
                 </div>
-              </div>
+            </div>
 
-              <button onClick={handleStart} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-lg shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2">
-                Bắt đầu nghe <ArrowRight className="w-5 h-5" />
-              </button>
+            {/* 3. Danh sách Đề thi (List of Tests) */}
+            <div>
+                <h3 className="font-bold text-xl text-gray-800 mb-4 flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">3</span>
+                    Danh sách đề thi có sẵn
+                </h3>
+                
+                {loading ? (
+                    <div className="text-center py-10 text-gray-400">Đang tải đề thi...</div>
+                ) : tests.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-4">
+                        {tests.map((test, index) => (
+                            <div key={test.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex items-center justify-between group">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                        {index + 1}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-gray-800 text-lg group-hover:text-indigo-600 transition-colors">
+                                            {test.title || `Đề luyện tập số ${index + 1}`}
+                                        </h4>
+                                        <div className="flex gap-4 text-xs text-gray-500 mt-1">
+                                            <span className="flex items-center gap-1"><Clock size={14}/> 40 phút</span>
+                                            <span className="flex items-center gap-1"><CheckCircle2 size={14}/> 35 câu hỏi</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => handleStartTest(test.id)}
+                                    className="px-6 py-2.5 bg-white border-2 border-indigo-600 text-indigo-600 font-bold rounded-lg hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-2"
+                                >
+                                    Làm bài <PlayCircle size={18}/>
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="bg-white p-8 rounded-xl text-center border border-dashed border-gray-300">
+                        <p className="text-gray-500">Chưa có đề thi nào cho chủ đề này.</p>
+                    </div>
+                )}
             </div>
           </div>
+
+          {/* --- CỘT PHẢI: LỊCH SỬ & THỐNG KÊ (1/3) --- */}
+          <div className="space-y-6">
+            
+            {/* Thẻ thống kê nhanh */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <BarChart3 size={20} className="text-orange-500"/> Tổng quan kỹ năng
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-orange-50 p-4 rounded-xl text-center">
+                        <div className="text-2xl font-black text-orange-600">{history.length}</div>
+                        <div className="text-xs text-orange-800 font-medium">Đề đã làm</div>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-xl text-center">
+                        <div className="text-2xl font-black text-green-600">
+                            {history.length > 0 ? (history.reduce((a,b) => a + Number(b.diem_so), 0) / history.length).toFixed(1) : 0}
+                        </div>
+                        <div className="text-xs text-green-800 font-medium">Điểm trung bình</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Bảng Lịch sử */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                        <History size={18} className="text-gray-500"/> Lịch sử làm bài
+                    </h4>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                    {history.length > 0 ? (
+                        <div className="divide-y divide-gray-100">
+                            {history.map((h, i) => (
+                                <div key={i} className="p-4 hover:bg-gray-50 transition-colors">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="font-bold text-sm text-gray-800 truncate max-w-[180px]" title={h.tieu_de_bai_thi}>
+                                            {h.tieu_de_bai_thi || "Đề luyện tập"}
+                                        </span>
+                                        <span className={`font-bold ${h.diem_so >= 5 ? 'text-green-600' : 'text-red-500'}`}>
+                                            {h.diem_so}/10
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs text-gray-400">
+                                        <span>{h.ngay_lam}</span>
+                                        <span>⏱ {Math.round(h.thoi_gian_lam / 60)} phút</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="p-8 text-center text-gray-400 text-sm">Chưa có dữ liệu lịch sử.</div>
+                    )}
+                </div>
+                {history.length > 0 && (
+                    <button className="w-full py-3 text-sm text-blue-600 font-bold hover:bg-blue-50 transition-colors flex items-center justify-center gap-1">
+                        Xem tất cả <ChevronRight size={14}/>
+                    </button>
+                )}
+            </div>
+
+          </div>
+
         </div>
       </main>
       <Footer />

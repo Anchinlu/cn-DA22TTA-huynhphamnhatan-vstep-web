@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, FileText, Link as LinkIcon, 
   CheckCircle2, Clock, User, Save, ExternalLink,
-  Search, Filter, ChevronRight
+  Search
 } from 'lucide-react';
-
-// Không import Header/Footer nữa để tối ưu không gian
 
 const AssignmentDetail = () => {
   const { id } = useParams();
@@ -19,12 +17,11 @@ const AssignmentDetail = () => {
   const [grade, setGrade] = useState('');
   const [feedback, setFeedback] = useState('');
   
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all'); // all, graded, pending
+  const [filterStatus, setFilterStatus] = useState('all'); 
 
-  // Fetch dữ liệu
-  const fetchSubmissions = async () => {
+  // Fetch dữ liệu (Dùng useCallback để fix warning)
+  const fetchSubmissions = useCallback(async () => {
     try {
       const token = localStorage.getItem('vstep_token');
       const res = await fetch(`http://localhost:5000/api/assignments/${id}/submissions`, {
@@ -33,14 +30,14 @@ const AssignmentDetail = () => {
       const data = await res.json();
       setSubmissions(data);
       setFilteredSubs(data);
-      setLoading(false);
     } catch (err) {
       console.error(err);
-      setLoading(false);
     }
-  };
+  }, [id]);
 
-  useEffect(() => { fetchSubmissions(); }, [id]);
+  useEffect(() => { 
+    fetchSubmissions(); 
+  }, [fetchSubmissions]);
 
   // Filter & Search Logic
   useEffect(() => {
@@ -100,7 +97,7 @@ const AssignmentDetail = () => {
   return (
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
       
-      {/* --- CỘT 1: DANH SÁCH (SIDEBAR) - 25% --- */}
+      {/* --- CỘT 1: DANH SÁCH (SIDEBAR) --- */}
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col z-10">
         
         {/* Sidebar Header */}
@@ -118,7 +115,7 @@ const AssignmentDetail = () => {
             <input 
               type="text" 
               placeholder="Tìm tên học viên..." 
-              className="w-full pl-9 pr-3 py-2bg-slate-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
@@ -163,13 +160,13 @@ const AssignmentDetail = () => {
         </div>
       </div>
 
-      {/* --- CỘT 2: KHÔNG GIAN CHẤM BÀI (MAIN) - 75% --- */}
+      {/* --- CỘT 2: KHÔNG GIAN CHẤM BÀI (MAIN) --- */}
       <div className="flex-1 flex flex-col bg-slate-100 h-full overflow-hidden">
         
         {selectedSub ? (
           <div className="flex h-full">
             
-            {/* A. Nội dung bài làm (Scrollable) */}
+            {/* A. Nội dung bài làm */}
             <div className="flex-1 overflow-y-auto p-8">
               <div className="bg-white min-h-full rounded-2xl shadow-sm border border-gray-200 p-8 lg:p-12">
                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-gray-100 pb-4">
@@ -199,7 +196,7 @@ const AssignmentDetail = () => {
               </div>
             </div>
 
-            {/* B. Form Chấm điểm (Fixed Right Sidebar) */}
+            {/* B. Form Chấm điểm */}
             <div className="w-96 bg-white border-l border-gray-200 flex flex-col shadow-xl z-20">
                 <div className="p-6 border-b border-gray-100">
                     <h3 className="font-bold text-gray-800 text-lg">Đánh giá & Cho điểm</h3>
@@ -247,7 +244,7 @@ const AssignmentDetail = () => {
 
           </div>
         ) : (
-          // Empty State (Chưa chọn bài)
+          // Empty State
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
              <div className="w-24 h-24 bg-slate-200 rounded-full flex items-center justify-center mb-6">
                 <User size={48} className="text-slate-400"/>

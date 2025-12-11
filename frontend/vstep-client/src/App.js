@@ -29,6 +29,10 @@ import UserManagement from './pages/admin/UserManagement.jsx';
 import ClassManagement from './pages/admin/ClassManagement.jsx';
 import ClassDetail from './pages/ClassDetail.jsx';
 import AssignmentDetail from './pages/admin/AssignmentDetail.jsx';
+import StudentAssignment from './pages/StudentAssignment';
+import Header from './components/Header';
+import Footer from './components/Footer';
+import Profile from './pages/Profile';
 
 function App() {
   return (
@@ -44,16 +48,31 @@ function App() {
         {/* TRANG CẦN BẢO VỆ */}
         <Route element={<PrivateRoute />}>
           <Route path="/practice/reading" element={<ReadingDashboard />} />
-          <Route path="/practice/reading/test" element={<ReadingPractice />} />
+          <Route path="/practice/reading/start" element={<ReadingPractice />} />
           <Route path="/practice/listening" element={<ListeningDashboard />} />
-          <Route path="/practice/listening/test" element={<ListeningPractice />} />
+          <Route path="/practice/listening/start" element={<ListeningPractice />} />
           <Route path="/practice/writing" element={<WritingDashboard />} />
           <Route path="/practice/writing/test" element={<WritingPractice />} />
           <Route path="/practice/speaking" element={<SpeakingDashboard />} />
           <Route path="/practice/speaking/test" element={<SpeakingPractice />} />
           <Route path="/join-class" element={<JoinClass />} />
           <Route path="/my-courses" element={<MyCourses />} />
-          <Route path="/class/:id" element={<ClassDetail />} />
+          <Route path="/class/assignment/:id" element={<StudentAssignment />} />
+          {/* class detail moved into admin area */}
+          <Route path="/profile" element={<Profile />} />
+          {/* === THÊM LẠI ROUTE NÀY CHO HỌC VIÊN === */}
+          <Route path="/class/:id" element={
+            <div className="flex flex-col min-h-screen bg-gray-50 font-sans">
+              <Header />
+              <main className="flex-grow pt-24 pb-12 px-4 sm:px-6">
+                <div className="max-w-6xl mx-auto">
+                  <ClassDetail />
+                </div>
+              </main>
+              <Footer />
+            </div>
+          } />
+          {/* ======================================== */}
         
         </Route>
 
@@ -61,9 +80,16 @@ function App() {
         <Route element={<AdminRoute />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
-            <Route path="users" element={<UserManagement />} />
+            {/* Dashboard chung */}
+            <Route index element={<AdminDashboard />} />
+            {/* Quản lý danh sách lớp */}
             <Route path="classes" element={<ClassManagement />} />
+            {/* --- DI CHUYỂN VÀO ĐÂY: Chi tiết lớp học (Nằm trong Admin) --- */}
+            <Route path="class/:id" element={<ClassDetail />} />
+            {/* Trang chấm bài (Giữ nguyên) */}
             <Route path="assignment/:id" element={<AssignmentDetail />} />
+            {/* Các trang admin khác... */}
+            <Route path="users" element={<UserManagement />} />
           </Route>
         </Route>
 

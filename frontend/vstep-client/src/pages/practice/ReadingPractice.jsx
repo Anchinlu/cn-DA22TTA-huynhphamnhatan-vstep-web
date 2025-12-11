@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Clock, ArrowLeft, CheckCircle, XCircle, BookOpen, 
   AlertTriangle, Sparkles, Loader2, Play, Home,
-  Globe, Lightbulb, BookMarked, Settings, Type
+  Globe, Lightbulb, Type, AlertCircle
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const ReadingPractice = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { level, topic } = location.state || { level: 'B1', topic: 'education' }; 
+  // Nhận testId từ Dashboard
+  const { level, topic, testId } = location.state || { level: 'B1', topic: 'daily_life', testId: null }; 
 
   // --- STATE ---
   const [testData, setTestData] = useState(null);
@@ -29,45 +30,55 @@ const ReadingPractice = () => {
   // Setting State (Tùy chỉnh cỡ chữ)
   const [fontSize, setFontSize] = useState('text-base'); // text-sm, text-base, text-lg
 
-  // 1. FETCH ĐỀ THI
-  useEffect(() => {
-    const fetchTest = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`http://localhost:5000/api/reading/test?level=${level}&topic=${topic}`);
-        if (!response.ok) throw new Error('Không tìm thấy bài đọc phù hợp.');
-        const data = await response.json();
-        setTestData(data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+  // 1. FETCH ĐỀ THI (Cập nhật logic lấy theo ID)
+  const fetchTest = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      let url = `http://localhost:5000/api/reading/test?level=${level}&topic=${topic}`;
+      if (testId) {
+          url = `http://localhost:5000/api/reading/test?id=${testId}`;
       }
-    };
-    fetchTest();
-  }, [level, topic]);
 
-  // 2. TIMER
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Không tìm thấy bài đọc phù hợp.');
+      const data = await response.json();
+      setTestData(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [level, topic, testId]);
+
+  useEffect(() => {
+    fetchTest();
+  }, [fetchTest]);
+
+  // 2. TIMER & AUTO SUBMIT
   useEffect(() => {
     if (!isStarted || isSubmitted) return;
+    
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 0) {
           clearInterval(timer);
-          handleSubmit();
+          handleSubmit(true); // Hết giờ -> Force submit
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     
+    // Chặn F5/Back
     const handleBeforeUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', handleBeforeUnload);
+    
     return () => {
       clearInterval(timer);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [isStarted, isSubmitted]);
+  }, [isStarted, isSubmitted]); // Lưu ý: handleSubmit cần được define trước hoặc dùng useCallback (xem bên dưới)
 
   // HANDLERS
   const formatTime = (s) => {
@@ -90,8 +101,22 @@ const ReadingPractice = () => {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!isSubmitted && window.confirm("Nộp bài ngay?")) {
+  // Logic Nộp Bài (Có Validate)
+  const handleSubmit = useCallback((force = false) => {
+    if (isSubmitted) return;
+
+    // Validate: Kiểm tra làm hết chưa (nếu không phải force submit)
+    if (!force && testData?.questions) {
+        const totalQ = testData.questions.length;
+        const answeredQ = Object.keys(answers).length;
+        if (answeredQ < totalQ) {
+            const missing = totalQ - answeredQ;
+            alert(`⚠️ Bạn còn ${missing} câu chưa trả lời! Vui lòng hoàn thành trước khi nộp.`);
+            return;
+        }
+    }
+
+    if (force || window.confirm("Nộp bài ngay?")) {
       setIsSubmitted(true);
       setShowResult(true);
 
@@ -103,19 +128,27 @@ const ReadingPractice = () => {
 
       const token = localStorage.getItem('vstep_token');
       if (token) {
-        try {
-          await fetch('http://localhost:5000/api/results', {
+        // Tạo tiêu đề hiển thị đẹp
+        const displayTitle = `Reading - ${testData.title || 'Bài tập'}`;
+        
+        fetch('http://localhost:5000/api/results', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({
-              skill: 'reading', level: level, score: finalScore, duration: (60 * 60) - timeLeft
+                skill: 'reading', 
+                level: level, 
+                score: finalScore, 
+                duration: (60 * 60) - timeLeft,
+                testTitle: displayTitle // Lưu tên đề
             })
-          });
-        } catch (e) { console.error(e); }
+        }).catch(e => console.error(e));
       }
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  };
+  }, [isSubmitted, testData, answers, level, timeLeft]);
 
+  // AI Explain (Gửi kèm context bài đọc)
   const handleAiExplain = async (questionId, questionData) => {
     if (aiExplanations[questionId]) return;
     setExplainingId(questionId);
@@ -127,7 +160,8 @@ const ReadingPractice = () => {
           question: questionData.question,
           options: questionData.options,
           correct: questionData.correct,
-          userAnswer: answers[questionId]
+          userAnswer: answers[questionId],
+          context: testData.content // QUAN TRỌNG: Gửi bài đọc cho AI
         })
       });
       const data = await res.json();
@@ -183,6 +217,7 @@ const ReadingPractice = () => {
           {/* Right Content */}
           <div className="w-full md:w-2/3 p-10">
              <h3 className="text-xl font-bold text-slate-800 mb-6">Thông tin bài thi</h3>
+             <h4 className="text-md font-bold text-indigo-700 mb-4 line-clamp-2">{testData.title}</h4>
              
              <div className="space-y-4 mb-8">
                <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
@@ -237,7 +272,7 @@ const ReadingPractice = () => {
           </div>
           
           {!isSubmitted ? (
-            <button onClick={handleSubmit} className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg shadow-lg shadow-indigo-900/20 transition-all active:scale-95 text-sm">
+            <button onClick={() => handleSubmit(false)} className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg shadow-lg shadow-indigo-900/20 transition-all active:scale-95 text-sm">
               Nộp bài
             </button>
           ) : (
@@ -266,23 +301,30 @@ const ReadingPractice = () => {
             </h2>
             <div 
               className={`prose prose-slate max-w-none text-justify font-serif text-slate-800 leading-loose ${fontSize}`}
-              dangerouslySetInnerHTML={{ __html: testData.content }}
-            />
+              style={{whiteSpace: 'pre-line'}}
+            >
+              {testData.content}
+            </div>
           </div>
         </div>
 
         {/* RIGHT: CÂU HỎI (Modern Cards) */}
         <div className="w-1/2 h-full overflow-y-auto bg-slate-100 p-6 lg:p-8">
           <div className="max-w-2xl mx-auto space-y-8 pb-24">
-            {testData.questions.map((q, idx) => (
-              <div key={q.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 transition-shadow hover:shadow-md">
+            {testData.questions.map((q, idx) => {
+              const isMissed = isSubmitted && !answers[q.id]; // Câu chưa làm
+              return (
+              <div key={q.id} className={`bg-white p-6 rounded-2xl border transition-shadow hover:shadow-md ${isMissed ? 'border-red-300 ring-2 ring-red-100' : 'border-slate-200 shadow-sm'}`}>
                 
                 {/* Question Number & Text */}
                 <div className="flex gap-4 mb-5">
-                  <span className="flex-shrink-0 w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center font-bold text-sm shadow-md">
+                  <span className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shadow-md ${isMissed ? 'bg-red-500 text-white' : 'bg-slate-900 text-white'}`}>
                     {idx + 1}
                   </span>
-                  <h3 className="text-slate-800 font-bold text-lg pt-0.5 leading-snug">{q.question}</h3>
+                  <h3 className="text-slate-800 font-bold text-lg pt-0.5 leading-snug">
+                    {q.question}
+                    {isMissed && <span className="text-red-500 text-xs font-bold ml-2 flex items-center inline-flex gap-1"><AlertCircle size={12}/> Chưa làm</span>}
+                  </h3>
                 </div>
 
                 {/* Options Grid */}
@@ -362,7 +404,7 @@ const ReadingPractice = () => {
                   </div>
                 )}
               </div>
-            ))}
+            )})}
           </div>
         </div>
       </div>

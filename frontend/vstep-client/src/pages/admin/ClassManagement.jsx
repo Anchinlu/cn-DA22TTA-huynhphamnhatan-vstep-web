@@ -14,27 +14,29 @@ const ClassManagement = () => {
   const [newClassName, setNewClassName] = useState('');
   const [newClassDesc, setNewClassDesc] = useState('');
 
+  // Fetch Data (Phiên bản Debug)
   const fetchClasses = async () => {
     try {
-      setLoading(true);
       const token = localStorage.getItem('vstep_token');
-      const res = await fetch('http://localhost:5000/api/teacher/classes', {
+      console.log("Token gửi đi:", token); // Xem ở Console trình duyệt (F12)
+
+      const res = await fetch('http://localhost:5000/api/classes', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
-      const data = await res.json();
 
-      // KIỂM TRA AN TOÀN: Chỉ setClasses nếu data thực sự là một mảng
-      if (Array.isArray(data)) {
+      console.log("Status API:", res.status); // Xem mã lỗi (200, 401, 500?)
+
+      if (res.ok) {
+        const data = await res.json();
+        console.log("Dữ liệu nhận được:", data); // Xem có bao nhiêu lớp
         setClasses(data);
       } else {
-        console.error("API trả về dữ liệu không phải mảng:", data);
-        setClasses([]); 
-        if (data.message) alert("Lỗi: " + data.message);
+        const errText = await res.text();
+        alert(`Lỗi API: ${res.status} - ${errText}`); // Hiện thông báo lỗi ngay trên màn hình
       }
     } catch (err) {
-      console.error("Lỗi tải danh sách:", err);
-      setClasses([]); // Fallback an toàn
+      console.error(err);
+      alert("Lỗi kết nối Server (Kiểm tra Backend đã bật chưa?)");
     } finally {
       setLoading(false);
     }
@@ -116,7 +118,7 @@ const ClassManagement = () => {
               <div className="p-4 border-t border-gray-50 bg-gray-50/50">
                 {/* === NÚT BẤM CHUYỂN HƯỚNG === */}
                 <button 
-                  onClick={() => navigate(`/class/${cls.id}`)}
+                  onClick={() => navigate(`/admin/class/${cls.id}`)}
                   className="w-full py-2.5 bg-white border border-blue-200 text-blue-600 font-bold rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2"
                 >
                   Vào lớp & Quản lý <ArrowRight size={16} />

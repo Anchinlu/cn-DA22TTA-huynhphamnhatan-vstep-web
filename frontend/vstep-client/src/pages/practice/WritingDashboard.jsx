@@ -1,47 +1,100 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   PenTool, Mail, FileText, 
-  CheckCircle2, Info, ArrowRight,
-  BookOpen, Briefcase, Globe, Cpu, Zap, ArrowLeft
+  CheckCircle2, BookOpen, Briefcase, Globe, Cpu, Zap, 
+  ArrowRight, Clock, AlertCircle, BarChart3, History 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import Header from '../../components/Header.jsx';
-import Footer from '../../components/Footer.jsx';
+import Header from '../../components/Header';
+import Footer from '../../components/Footer';
 
 const WritingDashboard = () => {
   const navigate = useNavigate();
-  const [selectedTask, setSelectedTask] = useState('1'); // 1: Task 1, 2: Task 2
-  const [selectedTopic, setSelectedTopic] = useState('education');
-  const [level, setLevel] = useState('B1');
+  
+  // State quản lý lựa chọn
+  const [selectedTask, setSelectedTask] = useState('task1'); // task1 / task2
+  const [selectedTopic, setSelectedTopic] = useState('daily_life');
+  const [selectedLevel, setSelectedLevel] = useState('B1');
 
+  // State dữ liệu
+  const [tests, setTests] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // Cấu hình Task
   const tasks = [
     { 
-      id: '1', 
-      name: 'Task 1: Viết thư (Letter)', 
-      desc: 'Viết email/thư phản hồi. Thời gian: 20 phút. Độ dài: ~120 từ.', 
+      id: 'task1', 
+      name: 'Task 1: Viết thư', 
+      desc: 'Viết email/thư phản hồi (~120 từ).', 
       icon: Mail,
       color: 'blue'
     },
     { 
-      id: '2', 
-      name: 'Task 2: Viết luận (Essay)', 
-      desc: 'Viết bài luận xã hội. Thời gian: 40 phút. Độ dài: ~250 từ.', 
+      id: 'task2', 
+      name: 'Task 2: Viết luận', 
+      desc: 'Viết bài luận xã hội (~250 từ).', 
       icon: FileText,
       color: 'orange'
     },
   ];
 
+  // Danh sách chủ đề
   const topics = [
+    { id: 'daily_life', name: 'Đời sống', icon: BookOpen },
     { id: 'education', name: 'Giáo dục', icon: BookOpen },
     { id: 'technology', name: 'Công nghệ', icon: Cpu },
     { id: 'business', name: 'Kinh tế', icon: Briefcase },
     { id: 'environment', name: 'Môi trường', icon: Globe },
-    { id: 'health', name: 'Sức khỏe', icon: Zap },
+    { id: 'travel', name: 'Du lịch', icon: Zap },
   ];
 
-  const handleStart = () => {
+  // 1. Fetch Danh sách đề thi (List)
+  useEffect(() => {
+    const fetchTests = async () => {
+      setLoading(true);
+      try {
+        // Gọi API lấy danh sách đề theo bộ lọc
+        const res = await fetch(`http://localhost:5000/api/writing/list?level=${selectedLevel}&topic=${selectedTopic}&task=${selectedTask}`);
+        if(res.ok) {
+            const data = await res.json();
+            setTests(data);
+        } else {
+            setTests([]);
+        }
+      } catch (error) {
+        console.error("Lỗi tải đề:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTests();
+  }, [selectedLevel, selectedTopic, selectedTask]);
+
+  // 2. Fetch Lịch sử làm bài
+  useEffect(() => {
+    const fetchHistory = async () => {
+        const token = localStorage.getItem('vstep_token');
+        if(!token) return;
+        try {
+            const res = await fetch(`http://localhost:5000/api/writing/history`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if(res.ok) setHistory(await res.json());
+        } catch (e) { console.error(e); }
+    };
+    fetchHistory();
+  }, []);
+
+  const handleStart = (testId) => {
+    // Chuyển sang trang làm bài kèm theo ID cụ thể
     navigate('/practice/writing/test', { 
-      state: { task: selectedTask, topic: selectedTopic, level } 
+      state: { 
+        task: selectedTask, 
+        topic: selectedTopic, 
+        level: selectedLevel,
+        testId: testId // <--- Truyền ID đề thi
+      } 
     });
   };
 
@@ -49,116 +102,153 @@ const WritingDashboard = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
       <Header />
       
-      <main className="flex-grow pt-24 pb-20">
-        {/* HERO */}
-        <div className="bg-indigo-900 text-white pt-10 pb-32 px-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500 rounded-full opacity-20 blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
-          
-          <div className="max-w-4xl mx-auto relative z-10">
-            <button onClick={() => navigate('/luyen-thi')} className="flex items-center text-indigo-200 hover:text-white mb-6 transition">
-              <ArrowLeft className="w-5 h-5 mr-2" /> Quay lại
-            </button>
+      <main className="flex-grow pt-24 pb-20 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
-                <PenTool className="w-10 h-10 text-indigo-300" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold">Luyện Viết (Writing)</h1>
-                <p className="text-indigo-200 mt-1">Rèn luyện kỹ năng viết thư và luận theo chuẩn VSTEP</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* SELECTION CARD */}
-        <div className="max-w-4xl mx-auto px-6 -mt-20 relative z-20">
-          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
-            
-            {/* 1. Chọn Dạng bài */}
-            <div className="mb-10">
-              <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <span className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold">1</span>
-                Chọn dạng bài (Task)
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {tasks.map((task) => (
-                  <button
-                    key={task.id}
-                    onClick={() => setSelectedTask(task.id)}
-                    className={`relative p-6 rounded-2xl border-2 text-left transition-all ${
-                      selectedTask === task.id 
-                      ? `border-${task.color}-500 bg-${task.color}-50` 
-                      : 'border-gray-100 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className={`absolute top-4 right-4 ${selectedTask === task.id ? `text-${task.color}-600` : 'text-transparent'}`}>
-                      <CheckCircle2 />
+            {/* --- CỘT TRÁI: BỘ LỌC & DANH SÁCH (2/3) --- */}
+            <div className="lg:col-span-2 space-y-8">
+                
+                {/* Header Card */}
+                <div className="bg-gradient-to-r from-indigo-800 to-purple-900 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
+                    <div className="relative z-10">
+                        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+                            <PenTool className="w-8 h-8"/> Luyện Viết VSTEP
+                        </h1>
+                        <p className="text-indigo-100 opacity-90 max-w-lg">
+                            Chọn dạng bài và chủ đề để bắt đầu. AI sẽ chấm điểm và sửa lỗi chi tiết cho bạn ngay lập tức.
+                        </p>
                     </div>
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`p-2 rounded-lg bg-${task.color}-100 text-${task.color}-600`}>
-                        <task.icon size={24} />
-                      </div>
-                      <h3 className={`text-lg font-bold text-${task.color}-700`}>{task.name}</h3>
+                    <div className="absolute right-0 bottom-0 opacity-10"><PenTool size={150} /></div>
+                </div>
+
+                {/* Bộ lọc */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    
+                    {/* 1. Chọn Task */}
+                    <h3 className="font-bold text-gray-800 mb-4">1. Chọn dạng bài</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                        {tasks.map((task) => (
+                        <button
+                            key={task.id}
+                            onClick={() => setSelectedTask(task.id)}
+                            className={`p-4 rounded-xl border-2 text-left transition-all flex items-start gap-3
+                            ${selectedTask === task.id 
+                                ? `border-${task.color}-500 bg-${task.color}-50 ring-1 ring-${task.color}-200` 
+                                : 'border-gray-100 hover:border-gray-300'}`}
+                        >
+                            <div className={`mt-1 p-2 rounded-lg bg-${task.color}-100 text-${task.color}-600`}><task.icon size={20}/></div>
+                            <div>
+                                <h4 className={`font-bold text-${task.color}-700`}>{task.name}</h4>
+                                <p className="text-xs text-gray-500 mt-1">{task.desc}</p>
+                            </div>
+                            {selectedTask === task.id && <CheckCircle2 className={`ml-auto text-${task.color}-600`} size={20}/>}
+                        </button>
+                        ))}
                     </div>
-                    <p className="text-sm text-gray-600">{task.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
 
-            {/* 2. Chọn Chủ đề & Level */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10">
-              <div>
-                <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                   <span className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold">2</span>
-                   Chọn chủ đề
-                </h2>
-                <div className="grid grid-cols-2 gap-3">
-                  {topics.map((t) => (
-                    <button 
-                      key={t.id}
-                      onClick={() => setSelectedTopic(t.id)}
-                      className={`p-3 rounded-xl border text-sm font-medium transition-all flex flex-col items-center justify-center gap-2
-                        ${selectedTopic === t.id ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}
-                      `}
-                    >
-                      <t.icon size={20} />
-                      {t.name}
-                    </button>
-                  ))}
+                    {/* 2. Trình độ & Chủ đề */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 className="font-bold text-gray-800 mb-3">2. Trình độ</h3>
+                            <div className="flex gap-2">
+                                {['B1', 'B2', 'C1'].map(lvl => (
+                                    <button key={lvl} onClick={() => setSelectedLevel(lvl)}
+                                        className={`flex-1 py-2 rounded-lg font-bold border transition-all ${selectedLevel === lvl ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                                        {lvl}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-gray-800 mb-3">3. Chủ đề</h3>
+                            <select 
+                                value={selectedTopic} 
+                                onChange={(e) => setSelectedTopic(e.target.value)}
+                                className="w-full p-2.5 rounded-lg border border-gray-300 font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                            >
+                                {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
                 </div>
-              </div>
 
-              <div>
-                <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                   <span className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold">3</span>
-                   Trình độ
-                </h2>
-                <div className="space-y-3">
-                   {['B1', 'B2', 'C1'].map(l => (
-                     <button 
-                        key={l} 
-                        onClick={() => setLevel(l)}
-                        className={`w-full p-3 rounded-xl border text-left font-bold transition-all ${level === l ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-400 hover:bg-gray-50'}`}
-                      >
-                        {l}
-                     </button>
-                   ))}
+                {/* Danh sách đề thi */}
+                <div>
+                    <h3 className="font-bold text-xl text-gray-800 mb-4 flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm">4</span>
+                        Danh sách đề bài
+                    </h3>
+                    
+                    {loading ? <div className="text-center py-10 text-gray-400">Đang tải đề...</div> : 
+                     tests.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-4">
+                            {tests.map((test, index) => (
+                                <div key={test.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex items-center justify-between group">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">{index + 1}</div>
+                                        <div>
+                                            <h4 className="font-bold text-gray-800 text-lg group-hover:text-indigo-600 transition-colors line-clamp-1">{test.title}</h4>
+                                            <div className="flex gap-4 text-xs text-gray-500 mt-1">
+                                                <span className="flex items-center gap-1"><Clock size={14}/> {selectedTask === 'task1' ? '20' : '40'} phút</span>
+                                                <span className="flex items-center gap-1"><PenTool size={14}/> {selectedTask === 'task1' ? 'Thư' : 'Luận'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => handleStart(test.id)} className="px-5 py-2 bg-white border-2 border-indigo-600 text-indigo-600 font-bold rounded-lg hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-2">
+                                        Viết bài <ArrowRight size={16}/>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="bg-white p-8 rounded-xl text-center border border-dashed border-gray-300">
+                            <AlertCircle className="w-10 h-10 text-gray-300 mx-auto mb-2"/>
+                            <p className="text-gray-500">Chưa có đề nào cho bộ lọc này.</p>
+                        </div>
+                    )}
                 </div>
-              </div>
             </div>
 
-            {/* START BUTTON */}
-            <div className="pt-6 border-t border-gray-100 flex justify-end">
-              <button 
-                onClick={handleStart}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 transition-transform hover:-translate-y-1 flex items-center gap-2"
-              >
-                Bắt đầu viết <ArrowRight size={20} />
-              </button>
+            {/* --- CỘT PHẢI: LỊCH SỬ (1/3) --- */}
+            <div className="space-y-6">
+                {/* Thống kê */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><BarChart3 size={20} className="text-orange-500"/> Thống kê Writing</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-orange-50 p-4 rounded-xl text-center">
+                            <div className="text-2xl font-black text-orange-600">{history.length}</div>
+                            <div className="text-xs text-orange-800 font-medium">Bài đã viết</div>
+                        </div>
+                        <div className="bg-indigo-50 p-4 rounded-xl text-center">
+                            <div className="text-2xl font-black text-indigo-600">{history.length > 0 ? (history.reduce((a,b) => a + Number(b.diem_so), 0) / history.length).toFixed(1) : 0}</div>
+                            <div className="text-xs text-indigo-800 font-medium">Điểm TB</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Lịch sử */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="p-5 border-b border-gray-100 bg-gray-50"><h4 className="font-bold text-gray-800 flex items-center gap-2"><History size={18}/> Bài viết gần đây</h4></div>
+                    <div className="max-h-[400px] overflow-y-auto divide-y divide-gray-100">
+                        {history.map((h, i) => (
+                            <div key={i} className="p-4 hover:bg-gray-50 transition-colors">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="font-bold text-sm text-gray-800 truncate max-w-[150px]" title={h.tieu_de_bai_thi}>
+                                        {h.tieu_de_bai_thi}
+                                    </span>
+                                    <span className={`font-bold ${h.diem_so >= 5 ? 'text-green-600' : 'text-red-500'}`}>{h.diem_so}/10</span>
+                                </div>
+                                <div className="text-xs text-gray-400 flex justify-between">
+                                    <span>{h.ngay_lam}</span>
+                                    <span>{Math.round(h.thoi_gian_lam / 60)} phút</span>
+                                </div>
+                            </div>
+                        ))}
+                        {history.length === 0 && <div className="p-6 text-center text-gray-400 text-sm">Chưa có bài viết nào.</div>}
+                    </div>
+                </div>
             </div>
-          </div>
+
         </div>
       </main>
       <Footer />

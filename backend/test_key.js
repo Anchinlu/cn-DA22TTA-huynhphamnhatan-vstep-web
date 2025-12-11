@@ -1,37 +1,52 @@
-// File: test_key.js
+// File: backend/test_key.js
 import 'dotenv/config';
 
-const key = process.env.GEMINI_API_KEY;
+const key = process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY;
 
-// Kiểm tra xem đã lấy được key chưa
 if (!key) {
-    console.error("❌ LỖI: Không tìm thấy GEMINI_API_KEY trong file .env!");
-    console.error("👉 Hãy chắc chắn file .env nằm cùng thư mục với file này.");
+    console.error("❌ LỖI: Không tìm thấy Key (GROQ_API_KEY) trong file .env!");
     process.exit(1);
 }
 
-const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
+const url = "https://api.groq.com/openai/v1/models";
 
-console.log("🔍 Đang kiểm tra danh sách Model cho Key: " + key.substring(0, 10) + "...");
+console.log(`🔍 Đang hỏi Groq danh sách model khả dụng...`);
+console.log(`🔑 Key: ${key.substring(0, 10)}...`);
+console.log("------------------------------------------------");
 
-try {
-    const response = await fetch(url);
-    const data = await response.json();
+async function checkModels() {
+    try {
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${key}`,
+                "Content-Type": "application/json"
+            }
+        });
 
-    if (data.error) {
-        console.error("❌ LỖI API TỪ GOOGLE:", data.error.message);
-    } else {
-        console.log("✅ KẾT NỐI THÀNH CÔNG! Danh sách model bạn được dùng:");
+        if (!response.ok) {
+            const err = await response.json();
+            console.error("❌ LỖI API:", JSON.stringify(err, null, 2));
+            return;
+        }
+
+        const data = await response.json();
+        const models = data.data;
+
+        console.log("✅ KẾT NỐI THÀNH CÔNG! Dưới đây là các Model bạn được dùng:");
         console.log("------------------------------------------------");
         
-        // Lọc và in ra danh sách
-        const models = data.models
-            .filter(m => m.supportedGenerationMethods.includes("generateContent"))
-            .map(m => m.name.replace("models/", ""));
-            
-        console.log(models.join("\n"));
+        // Lọc ra các model Llama và in ra
+        models.forEach(m => {
+            console.log(`- ${m.id}`);
+        });
+        
         console.log("------------------------------------------------");
+        console.log("💡 GỢI Ý: Hãy chọn 'llama-3.3-70b-versatile' hoặc 'llama-3.1-8b-instant' để thay vào app.js");
+
+    } catch (err) {
+        console.error("❌ Lỗi mạng hoặc code:", err.message);
     }
-} catch (err) {
-    console.error("❌ Lỗi mạng hoặc lỗi code:", err);
 }
+
+checkModels();

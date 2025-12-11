@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  BookOpen, Search, Menu, X, User, LogOut,
-  LayoutDashboard, School, BookMarked, 
-  PlusCircle
+  BookOpen, Search, Menu, X, LogOut,
+  LayoutDashboard, BookMarked
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const Header = () => {
   const navigate = useNavigate();
@@ -17,10 +16,6 @@ const Header = () => {
 
   const handleMyCourses = () => {
     navigate('/my-courses');
-  };
-  
-  const handleJoinClass = () => {
-    navigate('/join-class');
   };
 
   useEffect(() => {
@@ -45,7 +40,7 @@ const Header = () => {
     localStorage.removeItem('vstep_user');
     setCurrentUser(null);
     setIsDropdownOpen(false);
-    window.location.href = '/'; 
+    navigate('/'); // Dùng navigate để không reload trang
   };
 
   const baseLinks = [
@@ -54,19 +49,10 @@ const Header = () => {
     { name: 'Từ điển', href: '/dictionary' },
   ];
 
-  // === THAY ĐỔI: Hàm lấy menu quản trị theo vai trò ===
   const getManagementLinks = (roleId) => {
-    // Link mặc định cho cả GV và Admin
-    const links = [
+    return [
       { name: 'Trang Quản lý', href: '/admin', icon: LayoutDashboard }
     ];
-
-    // Chỉ GIÁO VIÊN (ID 2) mới thấy menu Lớp học ở Header
-    if (roleId === 2) {
-      links.push({ name: 'Lớp học', href: '/admin/classes', icon: School });
-    }
-
-    return links;
   };
 
   return (
@@ -89,33 +75,33 @@ const Header = () => {
             
             <nav className="flex space-x-1">
               {baseLinks.map((item) => (
-                <a
+                <Link
                   key={item.name}
-                  href={item.href}
+                  to={item.href}
                   className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"
                 >
                   {item.name}
-                </a>
+                </Link>
               ))}
 
-              {/* HIỂN THỊ MENU QUẢN TRỊ (Dynamic theo Role) */}
+              {/* DISPLAY MANAGEMENT MENU */}
               {currentUser && (currentUser.vaiTroId === 2 || currentUser.vaiTroId === 3) && (
                 getManagementLinks(currentUser.vaiTroId).map((item) => (
-                  <a
+                  <Link
                     key={item.name}
-                    href={item.href}
+                    to={item.href}
                     className="px-4 py-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800 rounded-full transition-all flex items-center gap-1.5 border border-indigo-100"
                   >
                     <item.icon className="w-4 h-4" />
                     {item.name}
-                  </a>
+                  </Link>
                 ))
               )}
             </nav>
             
             <div className="h-6 w-px bg-gray-200" />
 
-            {/* Nút "Khóa học của tôi" (Chỉ Học viên) */}
+            {/* "My Courses" Button (Student Only) */}
             {currentUser && currentUser.vaiTroId === 1 && (
                <button 
                   onClick={handleMyCourses}
@@ -163,20 +149,18 @@ const Header = () => {
                         </span>
                       </div>
                       
-                      <a href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-xl transition-colors">Thông tin tài khoản</a>
+                      <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-xl transition-colors">Thông tin tài khoản</Link>
                       
-                      {/* Link riêng cho Học viên */}
                       {currentUser.vaiTroId === 1 && (
-                        <a href="/my-courses" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-xl transition-colors font-medium text-blue-600">
+                        <Link to="/my-courses" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-xl transition-colors font-medium text-blue-600">
                           Khóa học của tôi
-                        </a>
+                        </Link>
                       )}
 
-                      {/* Link riêng cho Giáo viên/Admin */}
                       {(currentUser.vaiTroId === 2 || currentUser.vaiTroId === 3) && (
-                        <a href="/admin" className="block px-4 py-2 text-sm text-indigo-700 hover:bg-indigo-50 rounded-xl transition-colors font-bold">
+                        <Link to="/admin" className="block px-4 py-2 text-sm text-indigo-700 hover:bg-indigo-50 rounded-xl transition-colors font-bold">
                           Vào trang Quản trị
-                        </a>
+                        </Link>
                       )}
 
                       <div className="h-px bg-gray-100 my-2"></div>
@@ -187,7 +171,7 @@ const Header = () => {
                   )}
                 </div>
               ) : (
-                <a href="/dang-nhap" className="rounded-full bg-blue-600 text-white px-5 py-2 text-sm font-bold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg">Đăng nhập</a>
+                <Link to="/dang-nhap" className="rounded-full bg-blue-600 text-white px-5 py-2 text-sm font-bold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg">Đăng nhập</Link>
               )}
             </div>
           </div>
@@ -206,32 +190,30 @@ const Header = () => {
       {isMobileMenuOpen && (
         <div className="lg:hidden bg-white border-t border-gray-100 shadow-lg absolute w-full h-screen z-40">
           <div className="space-y-1 px-4 pt-4 pb-6">
-             {baseLinks.map((item) => (
-              <a key={item.name} href={item.href} className="block rounded-xl px-4 py-3 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700">{item.name}</a>
-             ))}
+              {baseLinks.map((item) => (
+              <Link key={item.name} to={item.href} className="block rounded-xl px-4 py-3 text-base font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700">{item.name}</Link>
+              ))}
 
-             {/* Mobile: Menu Quản trị (Dynamic) */}
-             {currentUser && (currentUser.vaiTroId === 2 || currentUser.vaiTroId === 3) && (
-               getManagementLinks(currentUser.vaiTroId).map((item) => (
-                <a key={item.name} href={item.href} className="flex items-center gap-2 rounded-xl px-4 py-3 text-base font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 mb-1">
+              {currentUser && (currentUser.vaiTroId === 2 || currentUser.vaiTroId === 3) && (
+                getManagementLinks(currentUser.vaiTroId).map((item) => (
+                <Link key={item.name} to={item.href} className="flex items-center gap-2 rounded-xl px-4 py-3 text-base font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 mb-1">
                   <item.icon className="w-5 h-5"/> {item.name}
-                </a>
+                </Link>
               ))
-             )}
+              )}
 
-             {/* Mobile: Khóa học của tôi */}
-             {currentUser && currentUser.vaiTroId === 1 && (
-               <button
+              {currentUser && currentUser.vaiTroId === 1 && (
+                <button
                   onClick={() => { setIsMobileMenuOpen(false); navigate('/my-courses'); }}
                   className="w-full text-left flex items-center gap-2 rounded-xl px-4 py-3 text-base font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-100"
                 >
                   <BookMarked className="w-5 h-5" /> Khóa học của tôi
                 </button>
-             )}
+              )}
 
-             <div className="border-t border-gray-100 my-4"></div>
-             {/* ... (Phần User Info & Logout giữ nguyên) ... */}
-             {currentUser ? (
+              <div className="border-t border-gray-100 my-4"></div>
+              
+              {currentUser ? (
                 <div className="px-4">
                   <div className="flex items-center gap-3 mb-6 bg-gray-50 p-3 rounded-xl">
                     <img className="h-12 w-12 rounded-full border border-white shadow-sm" src={`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.hoTen)}&background=0D8ABC&color=fff`} alt={currentUser.hoTen} />
@@ -241,9 +223,9 @@ const Header = () => {
                     <LogOut className="mr-2 h-5 w-5" /> Đăng xuất
                   </button>
                 </div>
-             ) : (
-                <div className="px-4 pt-4"><a href="/dang-nhap" className="block w-full text-center rounded-xl bg-blue-600 px-4 py-3 text-base font-bold text-white hover:bg-blue-700 shadow-lg">Đăng nhập / Đăng ký</a></div>
-             )}
+              ) : (
+                <div className="px-4 pt-4"><Link to="/dang-nhap" className="block w-full text-center rounded-xl bg-blue-600 px-4 py-3 text-base font-bold text-white hover:bg-blue-700 shadow-lg">Đăng nhập / Đăng ký</Link></div>
+              )}
           </div>
         </div>
       )}
