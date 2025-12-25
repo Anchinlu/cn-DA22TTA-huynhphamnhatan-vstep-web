@@ -4,15 +4,22 @@ import {
   School, Users, Clock, User, 
   PenTool, Plus, FileText, Check, X, ArrowLeft,
   Edit2, Save, UploadCloud, Trash2, Download, FolderOpen, File,
-  Loader2, Copy, QrCode, Info
+  Loader2, Copy, QrCode, Info, MessageSquare
 } from 'lucide-react';
+import ClassDiscussion from '../components/ClassDiscussion';
 
 // === CẤU HÌNH CLOUDINARY ===
 const CLOUD_NAME = "dmaeuom2i";
 const UPLOAD_PRESET = "vstep_upload";
 
 const ClassDetail = () => {
-  const { id } = useParams();
+  // Đổi id thành classId để khớp với App.js route "/class/:classId" hoặc "/admin/classes/:classId"
+  // Tuy nhiên, nếu route của bạn là "/class/:id", hãy giữ nguyên id.
+  // Dựa vào code cũ của bạn dùng { id }, nhưng App.js router lại dùng :classId
+  // Để an toàn, mình sẽ lấy cả hai.
+  const params = useParams();
+  const id = params.id || params.classId; 
+  
   const navigate = useNavigate();
   
   // Data State
@@ -66,8 +73,8 @@ const ClassDetail = () => {
   }, [id, isEditing]); // Thêm isEditing vào dependency để logic setEditForm chuẩn xác
 
   useEffect(() => { 
-    fetchData(); 
-  }, [fetchData]);
+    if(id) fetchData(); 
+  }, [fetchData, id]);
 
   const isTeacher = currentUser?.vaiTroId === 2; 
 
@@ -220,9 +227,10 @@ const ClassDetail = () => {
       </div>
 
       {/* 2. TABS */}
-      <div className="flex border-b border-gray-200 bg-white px-4 rounded-t-xl sticky top-0 z-10 shadow-sm">
+      <div className="flex border-b border-gray-200 bg-white px-4 rounded-t-xl sticky top-0 z-10 shadow-sm overflow-x-auto">
           {[
             { id: 'about', label: 'Giới thiệu', icon: Info },
+            { id: 'discussion', label: 'Thảo luận', icon: MessageSquare }, // Tab mới thêm
             { id: 'assignments', label: 'Bài tập', icon: PenTool },
             { id: 'documents', label: 'Tài liệu', icon: FolderOpen },
             { id: 'members', label: 'Thành viên', icon: Users },
@@ -230,7 +238,7 @@ const ClassDetail = () => {
               <button 
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-4 font-bold text-sm border-b-2 transition-all ${activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                className={`flex items-center gap-2 px-6 py-4 font-bold text-sm border-b-2 transition-all whitespace-nowrap ${activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
               >
                   <tab.icon size={18}/> 
                   {tab.label}
@@ -277,6 +285,13 @@ const ClassDetail = () => {
             </div>
         )}
 
+        {/* --- TAB THẢO LUẬN (MỚI) --- */}
+        {activeTab === 'discussion' && (
+            <div className="pt-2">
+                <ClassDiscussion classId={id} />
+            </div>
+        )}
+
         {/* --- TAB BÀI TẬP --- */}
         {activeTab === 'assignments' && (
             <div className="space-y-4 pt-6">
@@ -303,7 +318,7 @@ const ClassDetail = () => {
                                         <p className="text-xs text-gray-500 mt-1">Hạn: {new Date(a.han_nop).toLocaleDateString('vi-VN')}</p>
                                     </div>
                                 </div>
-                                <button onClick={() => isTeacher ? navigate(`/admin/assignment/${a.id}`) : navigate(`/class/assignment/${a.id}`)} className="px-4 py-2 bg-gray-50 text-gray-600 text-sm font-bold rounded-lg hover:bg-blue-600 hover:text-white transition">
+                                <button onClick={() => isTeacher ? navigate(`/admin/assignments/${a.id}`) : navigate(`/assignment/${a.id}`)} className="px-4 py-2 bg-gray-50 text-gray-600 text-sm font-bold rounded-lg hover:bg-blue-600 hover:text-white transition">
                                     {isTeacher ? 'Chấm bài' : 'Chi tiết'}
                                 </button>
                             </div>
@@ -420,15 +435,24 @@ const ClassDetail = () => {
       {/* MODAL GIAO BÀI */}
       {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-             <div className="bg-white w-full max-w-lg rounded-2xl p-6">
-                <h2 className="font-bold text-lg mb-4">Giao bài tập mới</h2>
+             <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl animate-scale-up">
+                <h2 className="font-bold text-lg mb-4 text-gray-800">Giao bài tập mới</h2>
                 <form onSubmit={handleCreateAssignment} className="space-y-4">
-                    <input className="w-full border p-2 rounded" placeholder="Tiêu đề" value={newAssign.tieu_de} onChange={e=>setNewAssign({...newAssign, tieu_de: e.target.value})} required/>
-                    <textarea className="w-full border p-2 rounded" placeholder="Mô tả" value={newAssign.mo_ta} onChange={e=>setNewAssign({...newAssign, mo_ta: e.target.value})}/>
-                    <input type="date" className="w-full border p-2 rounded" value={newAssign.han_nop} onChange={e => setNewAssign({...newAssign, han_nop: e.target.value})} />
-                    <div className="flex justify-end gap-2">
-                        <button type="button" onClick={()=>setShowModal(false)} className="px-4 py-2 text-gray-500">Hủy</button>
-                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Lưu</button>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Tiêu đề bài tập</label>
+                        <input className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ví dụ: Bài tập Writing Task 1..." value={newAssign.tieu_de} onChange={e=>setNewAssign({...newAssign, tieu_de: e.target.value})} required/>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Mô tả / Yêu cầu</label>
+                        <textarea className="w-full border border-gray-300 p-2.5 rounded-lg h-24 focus:ring-2 focus:ring-blue-500 outline-none resize-none" placeholder="Nhập hướng dẫn làm bài..." value={newAssign.mo_ta} onChange={e=>setNewAssign({...newAssign, mo_ta: e.target.value})}/>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Hạn nộp</label>
+                        <input type="date" className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" value={newAssign.han_nop} onChange={e => setNewAssign({...newAssign, han_nop: e.target.value})} required/>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button type="button" onClick={()=>setShowModal(false)} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg font-medium">Hủy</button>
+                        <button type="submit" className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md">Tạo bài tập</button>
                     </div>
                 </form>
              </div>

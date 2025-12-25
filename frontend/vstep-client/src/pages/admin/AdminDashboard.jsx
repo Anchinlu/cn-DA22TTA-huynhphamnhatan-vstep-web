@@ -4,6 +4,7 @@ import {
   ArrowRight, Activity, Server 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import TeacherRequestList from './TeacherRequestList';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -65,7 +66,12 @@ const AdminDashboard = () => {
          ))}
       </div>
 
-      {/* 3. Recent Users & Quick Actions */}
+      {/* 3. Teacher Request List (MỚI THÊM) */}
+      <div className="mt-8">
+        <TeacherRequestList />
+      </div>
+
+      {/* 4. Recent Users & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
          
          {/* Cột Trái: Người dùng mới */}
@@ -115,7 +121,6 @@ const AdminDashboard = () => {
                   <span className="font-bold text-gray-600 group-hover:text-purple-700">Quản lý Lớp học</span>
                   <ArrowRight size={18} className="text-gray-300 group-hover:text-purple-500"/>
                </button>
-               
             </div>
          </div>
 

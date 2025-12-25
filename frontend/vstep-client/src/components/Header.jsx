@@ -40,7 +40,7 @@ const Header = () => {
     localStorage.removeItem('vstep_user');
     setCurrentUser(null);
     setIsDropdownOpen(false);
-    navigate('/'); // Dùng navigate để không reload trang
+    navigate('/');
   };
 
   const baseLinks = [

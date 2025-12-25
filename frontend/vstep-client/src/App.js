@@ -33,6 +33,7 @@ import StudentAssignment from './pages/StudentAssignment';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Profile from './pages/Profile';
+import BecomeTeacher from './pages/BecomeTeacher';
 
 function App() {
   return (
@@ -58,6 +59,7 @@ function App() {
           <Route path="/join-class" element={<JoinClass />} />
           <Route path="/my-courses" element={<MyCourses />} />
           <Route path="/class/assignment/:id" element={<StudentAssignment />} />
+          <Route path="/become-teacher" element={<BecomeTeacher />} />
           {/* class detail moved into admin area */}
           <Route path="/profile" element={<Profile />} />
           {/* === THÊM LẠI ROUTE NÀY CHO HỌC VIÊN === */}
@@ -80,15 +82,10 @@ function App() {
         <Route element={<AdminRoute />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
-            {/* Dashboard chung */}
             <Route index element={<AdminDashboard />} />
-            {/* Quản lý danh sách lớp */}
             <Route path="classes" element={<ClassManagement />} />
-            {/* --- DI CHUYỂN VÀO ĐÂY: Chi tiết lớp học (Nằm trong Admin) --- */}
             <Route path="class/:id" element={<ClassDetail />} />
-            {/* Trang chấm bài (Giữ nguyên) */}
             <Route path="assignment/:id" element={<AssignmentDetail />} />
-            {/* Các trang admin khác... */}
             <Route path="users" element={<UserManagement />} />
           </Route>
         </Route>

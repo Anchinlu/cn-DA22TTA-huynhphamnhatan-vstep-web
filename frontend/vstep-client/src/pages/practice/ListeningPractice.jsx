@@ -22,7 +22,7 @@ const ListeningPractice = () => {
   // Audio State (TTS)
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isIntroSpeaking, setIsIntroSpeaking] = useState(false);
-  const [hasAudioEnded, setHasAudioEnded] = useState(false); // ✅ Đánh dấu đã đọc xong (để chặn nghe lại)
+  const [hasAudioEnded, setHasAudioEnded] = useState(false); 
   const [prepTimeLeft, setPrepTimeLeft] = useState(PREP_TIME); 
   const [isPrepPhase, setIsPrepPhase] = useState(true);
 
@@ -31,7 +31,7 @@ const ListeningPractice = () => {
   const [answers, setAnswers] = useState({});
   const [showResult, setShowResult] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(40 * 60); // 40 phút mặc định
+  const [timeLeft, setTimeLeft] = useState(40 * 60); 
 
   // AI State
   const [aiExplanations, setAiExplanations] = useState({}); 
@@ -60,7 +60,7 @@ const ListeningPractice = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Cleanup: Dừng đọc khi thoát trang
+  // Cleanup
   useEffect(() => {
     return () => {
       if (synthRef.current) {
@@ -70,7 +70,6 @@ const ListeningPractice = () => {
   }, []);
 
   // --- LOGIC GIỌNG NÓI ---
-
   const playIntro = useCallback(() => {
     if (!testData) return;
     synthRef.current.cancel();
@@ -99,16 +98,15 @@ const ListeningPractice = () => {
     u.onstart = () => setIsSpeaking(true);
     u.onend = () => {
         setIsSpeaking(false);
-        setHasAudioEnded(true); // ✅ QUAN TRỌNG: Đánh dấu đã đọc xong
+        setHasAudioEnded(true);
     };
     
     utteranceRef.current = u;
     synthRef.current.speak(u);
   }, [testData]);
 
-  // Toggle Play/Pause
   const togglePlay = () => {
-    if (hasAudioEnded) return; // ✅ CHẶN NGHE LẠI: Nếu đã kết thúc thì không làm gì cả
+    if (hasAudioEnded) return;
 
     if (synthRef.current.speaking) {
       if (synthRef.current.paused) {
@@ -119,13 +117,11 @@ const ListeningPractice = () => {
         setIsSpeaking(false);
       }
     } else {
-        // Chỉ cho phép start nếu chưa kết thúc
         if (!hasAudioEnded) startMainSpeaking();
     }
   };
 
   // --- FLOW CONTROL ---
-  
   const handleStart = () => {
       setIsStarted(true);
       setIsPrepPhase(true);
@@ -158,74 +154,76 @@ const ListeningPractice = () => {
       startMainSpeaking();
   };
 
-  // --- TIMER TỔNG (ĐÃ FIX LỖI) ---
-  useEffect(() => {
-    // Chỉ chạy timer khi đã bắt đầu làm bài và chưa nộp
-    if (!isStarted || isSubmitted) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-            clearInterval(timer);
-            handleSubmit(true); // Hết giờ -> Tự nộp (Force Submit)
-            return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isStarted, isSubmitted]); // Dependency chuẩn, không cần handleSubmit ở đây để tránh loop
-
-
-  // --- XỬ LÝ NỘP BÀI (VALIDATE) ---
+  // --- XỬ LÝ NỘP BÀI ---
   const handleSubmit = useCallback((force = false) => {
     if (isSubmitted) return;
 
-    // ✅ VALIDATE: Kiểm tra chọn hết đáp án chưa (trừ khi hết giờ - force=true)
+    // Validate
     if (!force && testData?.questions) {
         const totalQ = testData.questions.length;
         const answeredQ = Object.keys(answers).length;
         
         if (answeredQ < totalQ) {
             const missingCount = totalQ - answeredQ;
-            alert(`⚠️ Bạn còn ${missingCount} câu chưa chọn đáp án! Vui lòng hoàn thành trước khi nộp.`);
-            return; // Chặn nộp
+            alert(`⚠️ Bạn còn ${missingCount} câu chưa chọn đáp án!`);
+            return;
         }
     }
 
-    // Xác nhận nộp
-    if (force || window.confirm("Bạn chắc chắn muốn nộp bài?")) {
-      setIsSubmitted(true);
-      setShowResult(true);
-      synthRef.current.cancel(); // Dừng đọc ngay
-      setIsSpeaking(false);
-      setIsIntroSpeaking(false);
+    // Logic nộp
+    const processSubmit = () => {
+        setIsSubmitted(true);
+        setShowResult(true);
+        synthRef.current.cancel();
+        setIsSpeaking(false);
+        setIsIntroSpeaking(false);
 
-      let correctCount = 0;
-      if (testData?.questions) {
-          testData.questions.forEach(q => { if (answers[q.id] === q.correct) correctCount++; });
-      }
-      
-      const totalQ = testData?.questions?.length || 1;
-      const finalScore = Math.round((correctCount / totalQ) * 100) / 10;
+        let correctCount = 0;
+        if (testData?.questions) {
+            testData.questions.forEach(q => { if (answers[q.id] === q.correct) correctCount++; });
+        }
+        
+        const totalQ = testData?.questions?.length || 1;
+        const finalScore = Math.round((correctCount / totalQ) * 100) / 10;
 
-      const token = localStorage.getItem('vstep_token');
-      if (token) {
-        // Map tên hiển thị
-        const topicMap = { 'daily_life': 'Đời sống', 'education': 'Giáo dục', 'travel': 'Du lịch', 'technology': 'Công nghệ' };
-        const topicName = topicMap[topic] || topic;
-        const displayTitle = `${topicName} - ${testData.title || 'Bài tập'}`;
+        const token = localStorage.getItem('vstep_token');
+        if (token) {
+            const topicMap = { 'daily_life': 'Đời sống', 'education': 'Giáo dục', 'travel': 'Du lịch', 'technology': 'Công nghệ' };
+            const topicName = topicMap[topic] || topic;
+            const displayTitle = `${topicName} - ${testData.title || 'Bài tập'}`;
 
-        fetch('http://localhost:5000/api/results', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ skill: 'listening', level, score: finalScore, duration: (40 * 60) - timeLeft, testTitle: displayTitle })
-        }).catch(e => console.error(e));
-      }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+            fetch('http://localhost:5000/api/results', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ skill: 'listening', level, score: finalScore, duration: (40 * 60) - timeLeft, testTitle: displayTitle })
+            }).catch(e => console.error(e));
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    if (force) {
+        processSubmit();
+    } else if (window.confirm("Bạn chắc chắn muốn nộp bài?")) {
+        processSubmit();
     }
   }, [isSubmitted, testData, answers, level, timeLeft, topic]);
+
+  // --- TIMER TỔNG (ĐÃ SỬA LỖI STALE CLOSURE) ---
+  // 1. Chỉ đếm ngược thời gian
+  useEffect(() => {
+    if (!isStarted || isSubmitted) return;
+    const timer = setInterval(() => {
+      setTimeLeft(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isStarted, isSubmitted]);
+
+  // 2. Theo dõi timeLeft để trigger nộp bài
+  useEffect(() => {
+      if (timeLeft === 0 && isStarted && !isSubmitted) {
+          handleSubmit(true); // Force submit khi hết giờ
+      }
+  }, [timeLeft, isStarted, isSubmitted, handleSubmit]);
 
 
   const handleAnswer = (qId, option) => {
@@ -239,7 +237,7 @@ const ListeningPractice = () => {
     if (window.confirm("Thoát sẽ mất kết quả?")) navigate('/practice/listening');
   };
 
-  // ✅ AI Explain (Gửi kèm script content)
+  // AI Explain
   const handleAiExplain = async (qId, qData) => {
     if (aiExplanations[qId]) return;
     setExplainingId(qId);
@@ -251,7 +249,7 @@ const ListeningPractice = () => {
             options: qData.options, 
             correct: qData.correct, 
             userAnswer: answers[qId],
-            context: testData.script_content // Gửi thêm bài đọc gốc
+            context: testData.script_content 
         })
       });
       const json = await res.json();
@@ -300,7 +298,7 @@ const ListeningPractice = () => {
       <div className="w-full lg:w-[400px] bg-white border-r border-gray-200 flex flex-col shadow-xl z-20">
          <div className="h-16 flex items-center px-6 border-b border-gray-100 justify-between">
             <button onClick={handleExit}><ArrowLeft size={20} className="text-gray-500"/></button>
-            <span className="font-bold text-gray-700">AI Reading Test</span>
+            <span className="font-bold text-gray-700">Listening Test</span>
          </div>
 
          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-white to-indigo-50/50">
@@ -324,7 +322,6 @@ const ListeningPractice = () => {
                             {hasAudioEnded ? <span className="text-red-500">Đã kết thúc</span> : <span className="text-indigo-500">Đang đọc bài...</span>}
                         </div>
                         
-                        {/* ✅ Nút Play bị Disable hoàn toàn nếu đã nghe xong */}
                         <button 
                             onClick={togglePlay} 
                             disabled={hasAudioEnded}
@@ -338,8 +335,6 @@ const ListeningPractice = () => {
                         {isSpeaking && <div className="mt-4 flex gap-1 justify-center">
                             {[1,2,3].map(i => <div key={i} className="w-1.5 h-4 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: i*0.1+'s'}}></div>)}
                         </div>}
-                        
-                        {hasAudioEnded && !isSubmitted && <div className="mt-4 text-xs text-red-500 font-bold bg-red-50 px-3 py-1 rounded-full border border-red-100">Không thể nghe lại</div>}
                     </div>
                 )}
             </div>
@@ -370,7 +365,6 @@ const ListeningPractice = () => {
             </div>
             
             <div className="flex items-center gap-4">
-                {/* TIMER TỔNG */}
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono text-lg font-bold ${timeLeft < 300 ? 'bg-red-50 text-red-600 animate-pulse' : 'bg-gray-100 text-gray-700'}`}>
                     <Clock size={18} /><span>{formatTime(timeLeft)}</span>
                 </div>
@@ -383,28 +377,26 @@ const ListeningPractice = () => {
          <div className="flex-1 overflow-y-auto p-6 lg:p-10 scroll-smooth">
             <div className="max-w-3xl mx-auto space-y-6 pb-20">
                {testData.questions.map((q, idx) => {
-                  const isMissed = isSubmitted && !answers[q.id]; // Câu chưa làm (nếu force submit)
+                  const isMissed = isSubmitted && !answers[q.id]; 
                   return (
                   <div key={q.id} className={`bg-white p-6 rounded-2xl border shadow-sm relative transition-all ${isMissed ? 'border-red-300 bg-red-50' : 'border-gray-100'}`}>
-                     
-                     {/* Overlay khóa khi đang chuẩn bị */}
-                     {isPrepPhase && (
-                         <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-gray-200">
-                             <div className="bg-white px-3 py-1 rounded-full shadow-sm text-xs font-bold text-gray-400 flex items-center gap-1">
-                                 <Clock size={12}/> 
-                                 {isIntroSpeaking ? "Nghe hướng dẫn..." : "Đọc trước câu hỏi..."}
-                             </div>
-                         </div>
-                     )}
+                      
+                      {isPrepPhase && (
+                          <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-gray-200">
+                              <div className="bg-white px-3 py-1 rounded-full shadow-sm text-xs font-bold text-gray-400 flex items-center gap-1">
+                                  <Clock size={12}/> 
+                                  {isIntroSpeaking ? "Nghe hướng dẫn..." : "Đọc trước câu hỏi..."}
+                              </div>
+                          </div>
+                      )}
 
-                     <h3 className="font-bold text-gray-800 mb-4 flex gap-3 text-lg">
+                      <h3 className="font-bold text-gray-800 mb-4 flex gap-3 text-lg">
                         <span className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0">{idx+1}</span>
                         {q.question}
-                        {/* Cảnh báo nếu chưa trả lời (khi xem lại) */}
                         {isMissed && <span className="text-xs text-red-500 font-bold ml-auto flex items-center"><AlertCircle size={12} className="mr-1"/> Chưa trả lời</span>}
-                     </h3>
+                      </h3>
 
-                     <div className="space-y-3 ml-11">
+                      <div className="space-y-3 ml-11">
                         {q.options.map(opt => {
                             const label = opt.charAt(0);
                             const isSelected = answers[q.id] === label;
@@ -425,17 +417,28 @@ const ListeningPractice = () => {
                                 </div>
                             )
                         })}
-                     </div>
-                     
-                     {/* AI Explain Area */}
-                     {showResult && (
+                      </div>
+                      
+                      {/* AI Explain Area (Đã Fix Lỗi Render Object) */}
+                      {showResult && (
                       <div className="mt-6 ml-11 pt-4 border-t border-dashed border-gray-200">
                         {aiExplanations[q.id] ? (
                           <div className="bg-indigo-50 rounded-xl p-5 border border-indigo-100 animate-fade-in">
                             <div className="flex items-center gap-2 mb-3 text-indigo-700 font-bold text-sm uppercase"><Sparkles className="w-4 h-4" /> AI Giải thích</div>
                             <div className="space-y-3">
-                                <div><span className="text-xs font-bold text-gray-500 uppercase flex gap-1 mb-1"><Globe size={12}/> Dịch</span><p className="text-gray-800 italic text-sm">"{aiExplanations[q.id].translation}"</p></div>
-                                <div><span className="text-xs font-bold text-gray-500 uppercase flex gap-1 mb-1"><Lightbulb size={12}/> Giải thích</span><p className="text-gray-800 text-sm">{aiExplanations[q.id].explanation}</p></div>
+                                {/* Dùng Optional Chaining và kiểm tra kiểu dữ liệu an toàn */}
+                                <div>
+                                    <span className="text-xs font-bold text-gray-500 uppercase flex gap-1 mb-1"><Globe size={12}/> Dịch</span>
+                                    <p className="text-gray-800 italic text-sm">
+                                        {typeof aiExplanations[q.id].translation === 'string' ? aiExplanations[q.id].translation : "chờ chút nhé!"}
+                                    </p>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-bold text-gray-500 uppercase flex gap-1 mb-1"><Lightbulb size={12}/> Giải thích</span>
+                                    <p className="text-gray-800 text-sm">
+                                        {typeof aiExplanations[q.id].explanation === 'string' ? aiExplanations[q.id].explanation : "Chờ chút nhé!"}
+                                    </p>
+                                </div>
                             </div>
                           </div>
                         ) : (

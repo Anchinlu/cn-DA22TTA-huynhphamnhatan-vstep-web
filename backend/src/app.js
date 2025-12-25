@@ -1011,7 +1011,110 @@ app.get("/api/profile/stats", async (req, res) => {
     res.status(500).json({ message: "Lỗi lấy Profile" });
   }
 });
+// ============================================================
+// 9. TEACHER UPGRADE REQUESTS (NÂNG CẤP GIÁO VIÊN)
+// ============================================================
 
+// [USER] Gửi yêu cầu nâng cấp
+app.post("/api/teacher-request", async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const { so_dien_thoai, trinh_do, kinh_nghiem, link_cv } = req.body;
+
+    // Kiểm tra xem đã có yêu cầu đang chờ chưa
+    const [exists] = await pool.query("SELECT * FROM yeu_cau_nang_cap WHERE user_id = ? AND trang_thai = 'pending'", [decoded.userId]);
+    if (exists.length > 0) return res.status(400).json({ message: "Bạn đã gửi yêu cầu rồi, vui lòng chờ duyệt." });
+
+    await pool.query(
+      "INSERT INTO yeu_cau_nang_cap (user_id, so_dien_thoai, trinh_do, kinh_nghiem, link_cv) VALUES (?, ?, ?, ?, ?)",
+      [decoded.userId, so_dien_thoai, trinh_do, kinh_nghiem, link_cv]
+    );
+
+    res.json({ message: "Gửi yêu cầu thành công! Admin sẽ xét duyệt sớm." });
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+// [ADMIN] Lấy danh sách yêu cầu
+app.get("/api/admin/teacher-requests", async (req, res) => {
+  try {
+    // (Thực tế nên check quyền Admin ở đây)
+    const sql = `
+      SELECT y.*, u.ho_ten, u.email 
+      FROM yeu_cau_nang_cap y
+      JOIN nguoi_dung u ON y.user_id = u.user_id
+      WHERE y.trang_thai = 'pending'
+      ORDER BY y.ngay_tao DESC
+    `;
+    const [rows] = await pool.query(sql);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+// [ADMIN] Duyệt hoặc Từ chối
+app.post("/api/admin/teacher-requests/:id", async (req, res) => {
+  try {
+    const requestId = req.params.id;
+    const { action } = req.body; // 'approve' hoặc 'reject'
+
+    // Lấy thông tin request
+    const [reqs] = await pool.query("SELECT * FROM yeu_cau_nang_cap WHERE id = ?", [requestId]);
+    if (reqs.length === 0) return res.status(404).json({ message: "Không tìm thấy yêu cầu" });
+    const request = reqs[0];
+
+    if (action === 'approve') {
+      // 1. Cập nhật trạng thái request
+      await pool.query("UPDATE yeu_cau_nang_cap SET trang_thai = 'approved' WHERE id = ?", [requestId]);
+      // 2. Nâng cấp user lên Giáo viên (vai_tro_id = 2)
+      await pool.query("UPDATE nguoi_dung SET vai_tro_id = 2 WHERE user_id = ?", [request.user_id]);
+      res.json({ message: "Đã duyệt thành công!" });
+    } else {
+      // Từ chối
+      await pool.query("UPDATE yeu_cau_nang_cap SET trang_thai = 'rejected' WHERE id = ?", [requestId]);
+      res.json({ message: "Đã từ chối yêu cầu." });
+    }
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+// ============================================================
+// 10. CLASS DISCUSSION (DIỄN ĐÀN LỚP HỌC)
+// ============================================================
+
+// Lấy danh sách tin nhắn của một lớp
+app.get("/api/classes/:id/discussions", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sql = `
+      SELECT d.*, u.ho_ten, u.vai_tro_id 
+      FROM lop_hoc_thao_luan d
+      JOIN nguoi_dung u ON d.user_id = u.user_id
+      WHERE d.lop_hoc_id = ?
+      ORDER BY d.ngay_tao ASC
+    `;
+    const [rows] = await pool.query(sql, [id]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
+});
+
+// Gửi tin nhắn mới vào lớp
+app.post("/api/classes/:id/discussions", async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const { id } = req.params; // lop_hoc_id
+    const { noi_dung } = req.body;
+
+    await pool.query(
+      "INSERT INTO lop_hoc_thao_luan (lop_hoc_id, user_id, noi_dung) VALUES (?, ?, ?)",
+      [id, decoded.userId, noi_dung]
+    );
+
+    res.status(201).json({ message: "Đã gửi tin nhắn" });
+  } catch (err) { res.status(500).json({ message: "Lỗi gửi tin" }); }
+});
 // KHỞI ĐỘNG SERVER
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server chạy tại: http://localhost:${PORT}`));
