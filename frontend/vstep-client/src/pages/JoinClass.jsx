@@ -1,26 +1,26 @@
 import React, { useState } from 'react';
 import { 
-  School, ArrowRight, QrCode, Hash, 
-  CheckCircle, AlertCircle 
+  School, ArrowRight, QrCode, Hash
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+// [MỚI] Import toast
+import toast from 'react-hot-toast';
 
 const JoinClass = () => {
   const navigate = useNavigate();
   const [classCode, setClassCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
   const handleJoin = async (e) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
 
     try {
       const token = localStorage.getItem('vstep_token');
       if (!token) {
+        toast.error("Vui lòng đăng nhập trước!");
         navigate('/dang-nhap');
         return;
       }
@@ -40,15 +40,20 @@ const JoinClass = () => {
         throw new Error(data.message || 'Có lỗi xảy ra');
       }
 
-      // Thành công
-      alert(data.message);
+      // [MỚI] Thông báo thành công
+      toast.success(data.message); // "Đã gửi yêu cầu vào lớp..."
       navigate('/my-courses');
 
     } catch (err) {
-      setError(err.message);
+      // [MỚI] Thông báo lỗi
+      toast.error(err.message || "Không thể tham gia lớp");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleScanQR = () => {
+    toast("Tính năng quét QR đang phát triển!", { icon: '📷' });
   };
 
   return (
@@ -90,18 +95,10 @@ const JoinClass = () => {
                     className="block w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl text-lg font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all uppercase tracking-wider"
                     placeholder="VD: ENG101"
                     value={classCode}
-                    onChange={(e) => {
-                      setClassCode(e.target.value.toUpperCase());
-                      setError(null);
-                    }}
+                    onChange={(e) => setClassCode(e.target.value.toUpperCase())}
                     autoFocus
                   />
                 </div>
-                {error && (
-                  <div className="flex items-center gap-2 mt-2 text-red-500 text-sm font-medium animate-fade-in">
-                    <AlertCircle className="w-4 h-4" /> {error}
-                  </div>
-                )}
               </div>
 
               <button
@@ -129,7 +126,7 @@ const JoinClass = () => {
             </div>
 
             <button 
-              onClick={() => alert('Tính năng quét QR đang phát triển!')}
+              onClick={handleScanQR}
               className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center gap-2 text-slate-600 font-bold hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all group"
             >
               <QrCode className="w-5 h-5 group-hover:scale-110 transition-transform" />

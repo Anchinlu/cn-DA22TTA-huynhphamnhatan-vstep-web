@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, School, Users, 
-  LogOut, Home 
+  LogOut, Home, FileText,Zap // Thêm icon FileText cho đề thi
 } from 'lucide-react';
 
 const AdminLayout = () => {
@@ -22,6 +22,9 @@ const AdminLayout = () => {
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { name: 'Quản lý Người dùng', path: '/admin/users', icon: Users },
     { name: 'Quản lý Lớp học', path: '/admin/classes', icon: School },
+    // [MỚI] Thêm mục Kho đề thi
+    { name: 'Kho đề thi', path: '/admin/create-practice', icon: FileText },
+    { name: 'Đề Thi Thử full tacks', path: '/admin/mock-test', icon: Zap },
   ];
 
   const menuItems = user.vaiTroId === 3 ? adminMenu : teacherMenu;
@@ -82,15 +85,13 @@ const AdminLayout = () => {
           </button>
         </div>
         
-        {/* User Info (ĐÃ SỬA LỖI HIỂN THỊ TẠI ĐÂY) */}
+        {/* User Info */}
         <div className="p-4 bg-slate-950/30 flex items-center gap-3">
            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${user.vaiTroId === 3 ? 'bg-red-600' : 'bg-indigo-600'}`}>
               {user.hoTen?.charAt(0) || 'U'}
            </div>
            <div className="overflow-hidden">
               <p className="text-sm font-bold text-white truncate">{user.hoTen}</p>
-              
-              {/* Logic hiển thị đúng chức vụ */}
               <p className="text-xs text-slate-400 truncate font-medium">
                 {user.vaiTroId === 3 ? 'Quản trị viên (Admin)' : 'Giáo viên'}
               </p>
@@ -101,7 +102,7 @@ const AdminLayout = () => {
 
       {/* MAIN CONTENT */}
       <div className="flex-1 overflow-auto">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shadow-sm">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shadow-sm sticky top-0 z-10">
            <h2 className="text-xl font-bold text-gray-800">
              {menuItems.find(i => i.path === location.pathname)?.name || 'Quản lý'}
            </h2>

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Search, Volume2, Book, Loader2, AlertCircle, ArrowRight, List, Quote, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Volume2, Book, Loader2, AlertCircle, ArrowRight, List, Quote, History, Tag, Trash2 } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 
@@ -8,14 +8,41 @@ const Dictionary = () => {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // [MỚI] State cho lịch sử tìm kiếm
+  const [recentSearches, setRecentSearches] = useState([]);
+
+  // Load lịch sử từ localStorage khi khởi động
+  useEffect(() => {
+    const saved = localStorage.getItem('dict_history');
+    if (saved) {
+        setRecentSearches(JSON.parse(saved));
+    }
+  }, []);
+
+  // Hàm lưu lịch sử
+  const addToHistory = (newWord) => {
+    let updated = [newWord, ...recentSearches.filter(w => w !== newWord)];
+    if (updated.length > 5) updated = updated.slice(0, 5); // Giữ tối đa 5 từ
+    setRecentSearches(updated);
+    localStorage.setItem('dict_history', JSON.stringify(updated));
+  };
+
+  const clearHistory = () => {
+      setRecentSearches([]);
+      localStorage.removeItem('dict_history');
+  };
 
   const handleSearch = async (e) => {
-    e.preventDefault();
+    if(e) e.preventDefault();
     if (!word.trim()) return;
     
     setLoading(true);
     setError(null);
     setResult(null);
+
+    // Lưu vào lịch sử ngay khi tìm
+    addToHistory(word);
 
     try {
       const res = await fetch('http://localhost:5000/api/dictionary/lookup', {
@@ -43,6 +70,9 @@ const Dictionary = () => {
     window.speechSynthesis.speak(utterance);
   };
 
+  // Từ vựng VSTEP phổ biến (Hardcoded mẫu chất lượng)
+  const popularWords = ['Resilience', 'Sustainable', 'Mitigate', 'Diversity', 'Innovation'];
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 font-sans">
       <Header />
@@ -50,7 +80,7 @@ const Dictionary = () => {
       <main className="flex-grow pt-16 flex flex-col h-[calc(100vh-64px)]">
         <div className="flex flex-1 h-full overflow-hidden">
           
-          {/* --- CỘT TRÁI: TÌM KIẾM (30% - Cố định) --- */}
+          {/* --- CỘT TRÁI: TÌM KIẾM & LỊCH SỬ (30%) --- */}
           <div className="w-full lg:w-[30%] bg-white border-r border-gray-200 flex flex-col z-20 shadow-lg">
             <div className="p-8 border-b border-gray-100">
               <h1 className="text-2xl font-extrabold text-slate-800 flex items-center gap-3">
@@ -59,12 +89,12 @@ const Dictionary = () => {
                 </div>
                 Dictionary AI
               </h1>
-              <p className="text-slate-500 text-sm mt-2 ml-1">Tra cứu thông minh & Chính xác</p>
+              <p className="text-slate-500 text-sm mt-2 ml-1">Tra cứu từ vựng VSTEP chuẩn xác</p>
             </div>
 
             {/* Search Box */}
             <div className="p-8">
-              <form onSubmit={handleSearch} className="relative group">
+              <form onSubmit={handleSearch} className="relative group mb-8">
                 <div className="relative flex items-center">
                   <Search className="absolute left-4 w-5 h-5 text-slate-400" />
                   <input
@@ -85,14 +115,35 @@ const Dictionary = () => {
                 </div>
               </form>
               
-              {/* Gợi ý từ */}
-              <div className="mt-8">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Từ phổ biến</p>
+              {/* [MỚI] Lịch sử tìm kiếm */}
+              {recentSearches.length > 0 && (
+                  <div className="mb-8">
+                    <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><History size={12}/> Gần đây</p>
+                        <button onClick={clearHistory} className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1"><Trash2 size={10}/> Xóa</button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {recentSearches.map((w, idx) => (
+                            <button 
+                                key={idx}
+                                onClick={() => { setWord(w); handleSearch(); }}
+                                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-white hover:border-blue-300 hover:text-blue-600 transition-all"
+                            >
+                                {w}
+                            </button>
+                        ))}
+                    </div>
+                  </div>
+              )}
+
+              {/* Từ phổ biến */}
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1"><Tag size={12}/> Từ vựng VSTEP B1/B2</p>
                 <div className="flex flex-wrap gap-2">
-                  {['Resilience', 'Innovation', 'Sustainable', 'Empathy'].map(w => (
+                  {popularWords.map(w => (
                     <button 
                       key={w} 
-                      onClick={() => {setWord(w); handleSearch({preventDefault:()=>{}});}} 
+                      onClick={() => {setWord(w); handleSearch();}} 
                       className="px-4 py-2 text-sm font-medium bg-white border border-slate-200 rounded-xl text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 transition-all shadow-sm hover:shadow"
                     >
                       {w}
@@ -103,12 +154,12 @@ const Dictionary = () => {
             </div>
           </div>
 
-          {/* --- CỘT PHẢI: KẾT QUẢ (70% - Cuộn độc lập) --- */}
+          {/* --- CỘT PHẢI: KẾT QUẢ (70%) --- */}
           <div className="w-full lg:w-[70%] bg-slate-50/50 overflow-y-auto p-6 lg:p-12 flex flex-col">
             
             {/* TRẠNG THÁI CHỜ */}
             {!result && !loading && !error && (
-              <div className="h-full flex flex-col items-center justify-center text-slate-300">
+              <div className="h-full flex flex-col items-center justify-center text-slate-300 animate-fade-in">
                 <Book className="w-24 h-24 mb-6 opacity-20" />
                 <p className="text-xl font-medium text-slate-400">Nhập từ vựng để bắt đầu tra cứu</p>
               </div>
@@ -116,7 +167,7 @@ const Dictionary = () => {
 
             {/* TRẠNG THÁI LỖI */}
             {error && (
-              <div className="h-full flex flex-col items-center justify-center">
+              <div className="h-full flex flex-col items-center justify-center animate-fade-in">
                 <div className="bg-white p-8 rounded-3xl shadow-xl shadow-red-100/50 text-center max-w-md border border-red-50">
                   <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
                     <AlertCircle className="w-8 h-8" />
@@ -132,8 +183,11 @@ const Dictionary = () => {
               <div className="max-w-4xl mx-auto w-full animate-fade-in space-y-6">
                 
                 {/* 1. HEADER CARD */}
-                <div className="bg-white rounded-3xl p-10 shadow-xl shadow-slate-200/60 border border-slate-100">
-                  <div className="flex justify-between items-start">
+                <div className="bg-white rounded-3xl p-10 shadow-xl shadow-slate-200/60 border border-slate-100 relative overflow-hidden">
+                  {/* Decor Background */}
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50 rounded-full mix-blend-multiply filter blur-3xl opacity-50 -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+
+                  <div className="flex justify-between items-start relative z-10">
                     <div>
                       <div className="flex items-center gap-3 mb-3">
                         <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs uppercase tracking-wide border border-slate-200">
@@ -142,7 +196,7 @@ const Dictionary = () => {
                         <span className="text-slate-400 font-medium text-lg font-mono">/{result.phonetic}/</span>
                       </div>
                       
-                      <h1 className="text-5xl md:text-6xl font-black text-slate-900 tracking-tight mb-6">
+                      <h1 className="text-5xl md:text-6xl font-black text-slate-900 tracking-tight mb-6 capitalize">
                         {result.word}
                       </h1>
 
@@ -152,7 +206,6 @@ const Dictionary = () => {
                       </div>
                     </div>
 
-                    {/* Nút Loa (Đã sửa: Xanh nhạt, dịu mắt) */}
                     <button 
                       onClick={playAudio}
                       className="w-16 h-16 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white flex items-center justify-center transition-all duration-300 shadow-sm hover:shadow-lg hover:scale-105 active:scale-95 group"
@@ -182,7 +235,7 @@ const Dictionary = () => {
                     </div>
                   </div>
 
-                  {/* Cột Phải: Đồng nghĩa (Nhỏ) */}
+                  {/* Cột Phải: Đồng nghĩa */}
                   <div className="bg-white rounded-3xl p-8 shadow-lg shadow-slate-200/40 border border-slate-100 h-fit">
                     <h3 className="text-sm font-bold text-indigo-600 uppercase tracking-wider mb-6 flex items-center gap-2">
                       <div className="p-1.5 bg-indigo-100 rounded-md"><List className="w-4 h-4" /></div>
@@ -193,7 +246,7 @@ const Dictionary = () => {
                         result.synonyms.map((syn, i) => (
                           <span 
                             key={i} 
-                            onClick={() => {setWord(syn); handleSearch({preventDefault:()=>{}});}} 
+                            onClick={() => {setWord(syn); handleSearch();}} 
                             className="cursor-pointer px-3 py-1.5 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-sm font-medium hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-all"
                           >
                             {syn}

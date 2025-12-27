@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthInput from '../components/AuthInput';
+// [MỚI] Import toast
+import toast from 'react-hot-toast';
 
 // Component Logo Google
 const GoogleIcon = () => (
@@ -17,13 +19,11 @@ const DangNhap = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [mat_khau, setMatKhau] = useState('');
-  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
 
     try {
       const response = await fetch('http://localhost:5000/api/login', {
@@ -35,20 +35,25 @@ const DangNhap = () => {
       
       if (!response.ok) throw new Error(data.message || 'Có lỗi xảy ra');
 
+      // [MỚI] Lưu token và thông báo thành công
       localStorage.setItem('vstep_token', data.token);
       localStorage.setItem('vstep_user', JSON.stringify(data.user));
-      navigate('/'); 
+      
+      toast.success(`Chào mừng ${data.user.hoTen} quay lại!`);
+      
+      // Chuyển hướng
+      setTimeout(() => navigate('/'), 1000); 
 
     } catch (err) {
-      setError(err.message);
+      // [MỚI] Thông báo lỗi
+      toast.error(err.message || 'Đăng nhập thất bại');
     } finally {
       setLoading(false);
     }
   };
 
-  // Xử lý Google Login (Placeholder)
   const handleGoogleLogin = () => {
-    alert("Tính năng Đăng nhập Google đang phát triển!");
+    toast('Tính năng Đăng nhập Google đang phát triển!', { icon: '🚧' });
   };
 
   return (
@@ -116,13 +121,11 @@ const DangNhap = () => {
               required
             />
 
-            <div className="flex justify-end">
-              <a href="#" className="text-sm font-medium text-blue-700 hover:underline">
-                Quên mật khẩu?
-              </a>
+            <div className="flex justify-end mb-4">
+              <Link to="/forgot-password" className="text-sm text-indigo-600 hover:underline font-medium">
+                  Quên mật khẩu?
+              </Link>
             </div>
-
-            {error && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">{error}</p>}
 
             <button
               type="submit"

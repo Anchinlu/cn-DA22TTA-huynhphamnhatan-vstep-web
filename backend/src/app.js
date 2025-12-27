@@ -6,6 +6,14 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken"; 
 import path from 'path'; 
 import { fileURLToPath } from 'url';
+// [MỚI] Thêm thư viện cho tính năng quên mật khẩu
+import nodemailer from "nodemailer";
+import crypto from "crypto";
+import multer from 'multer';
+import { v2 as cloudinary } from 'cloudinary';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import xlsx from 'xlsx';
+import slugify from 'slugify';
 
 // --- CẤU HÌNH MÔI TRƯỜNG ---
 dotenv.config();
@@ -26,6 +34,15 @@ app.use(express.json());
 // [QUAN TRỌNG] Cấu hình phục vụ file tĩnh (Audio/Image)
 app.use(express.static(path.join(__dirname, '../public'))); 
 
+// --- [MỚI] CẤU HÌNH GỬI EMAIL (NODEMAILER) ---
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER, // Email của bạn (trong file .env)
+    pass: process.env.EMAIL_PASS, // Mật khẩu ứng dụng (trong file .env)
+  },
+});
+
 // --- KẾT NỐI DATABASE (MySQL Connection Pool) ---
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
@@ -45,6 +62,33 @@ pool.getConnection()
   .catch(err => console.error("❌ Lỗi kết nối DB:", err.message));
 
 app.get("/", (req, res) => res.send("✅ VSTEP Backend đang chạy!"));
+// ============================================================
+// CẤU HÌNH UPLOAD (CLOUDINARY & EXCEL)
+// ============================================================
+
+// 1. Cấu hình Cloudinary (Lấy từ .env)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// 2. Storage Cloud (Lưu Ảnh/Audio)
+const cloudStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'vstep-assets', // Tên thư mục trên Cloud
+    resource_type: 'auto',
+    allowed_formats: ['jpg', 'png', 'jpeg', 'mp3', 'wav'],
+  },
+});
+
+// 3. Storage Memory (Lưu Excel vào RAM để đọc nhanh)
+const memoryStorage = multer.memoryStorage();
+
+// Khởi tạo Middleware Upload
+const uploadMedia = multer({ storage: cloudStorage });
+const uploadExcel = multer({ storage: memoryStorage });
 
 // ============================================================
 // 1. AUTHENTICATION (Đăng nhập - Đăng ký)
@@ -113,6 +157,91 @@ app.post("/api/register", async (req, res) => {
   } catch (err) {
     console.error("Register Error:", err);
     res.status(500).json({ message: "Lỗi máy chủ" });
+  }
+});
+
+// ============================================================
+// 1.1 FORGOT PASSWORD (QUÊN MẬT KHẨU) - [MỚI]
+// ============================================================
+
+// API: Yêu cầu đặt lại mật khẩu (Gửi email)
+app.post("/api/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // 1. Kiểm tra email có tồn tại không
+    const [users] = await pool.query("SELECT * FROM nguoi_dung WHERE email = ?", [email]);
+    if (users.length === 0) {
+      return res.status(404).json({ message: "Email không tồn tại trong hệ thống." });
+    }
+
+    // 2. Tạo Token ngẫu nhiên (hiệu lực 15 phút)
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const expiry = new Date(Date.now() + 15 * 60 * 1000); // +15 phút
+
+    // 3. Lưu Token vào Database
+    await pool.query(
+      "UPDATE nguoi_dung SET reset_token = ?, reset_token_expiry = ? WHERE email = ?",
+      [resetToken, expiry, email]
+    );
+
+    // 4. Gửi Email chứa link reset
+    // Lưu ý: Link này trỏ về Frontend (Port 3000)
+    const resetLink = `http://localhost:3000/reset-password/${resetToken}`; 
+    
+    await transporter.sendMail({
+      from: '"VSTEP Support" <no-reply@vstep.com>',
+      to: email,
+      subject: "Yêu cầu đặt lại mật khẩu - VSTEP Pro",
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2 style="color: #4F46E5;">Xin chào ${users[0].ho_ten},</h2>
+          <p>Bạn vừa yêu cầu đặt lại mật khẩu. Vui lòng nhấn vào nút dưới đây để tạo mật khẩu mới:</p>
+          <a href="${resetLink}" style="display: inline-block; padding: 12px 24px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Đặt lại mật khẩu</a>
+          <p style="margin-top: 20px;">Link này sẽ hết hạn sau 15 phút.</p>
+          <p style="color: #666; font-size: 12px;">Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
+        </div>
+      `,
+    });
+
+    res.json({ message: "Đã gửi link đặt lại mật khẩu vào email của bạn!" });
+
+  } catch (err) {
+    console.error("Mail Error:", err);
+    res.status(500).json({ message: "Lỗi gửi email. Vui lòng thử lại sau." });
+  }
+});
+
+// API: Đặt mật khẩu mới (Reset Password)
+app.post("/api/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    // 1. Tìm user có token này và chưa hết hạn
+    const [users] = await pool.query(
+      "SELECT * FROM nguoi_dung WHERE reset_token = ? AND reset_token_expiry > NOW()",
+      [token]
+    );
+
+    if (users.length === 0) {
+      return res.status(400).json({ message: "Link không hợp lệ hoặc đã hết hạn." });
+    }
+
+    // 2. Mã hóa mật khẩu mới
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // 3. Cập nhật mật khẩu và xóa token
+    await pool.query(
+      "UPDATE nguoi_dung SET mat_khau = ?, reset_token = NULL, reset_token_expiry = NULL WHERE user_id = ?",
+      [hashedPassword, users[0].user_id]
+    );
+
+    res.json({ message: "Đổi mật khẩu thành công! Bạn có thể đăng nhập ngay." });
+
+  } catch (err) {
+    console.error("Reset Pass Error:", err);
+    res.status(500).json({ message: "Lỗi server." });
   }
 });
 
@@ -1078,6 +1207,170 @@ app.post("/api/admin/teacher-requests/:id", async (req, res) => {
   } catch (err) { res.status(500).json({ message: "Lỗi server" }); }
 });
 // ============================================================
+// API ADMIN: QUẢN LÝ ĐỀ THI & UPLOAD - [MỚI THÊM]
+// ============================================================
+
+// 1. Lấy danh sách Topic
+app.get('/api/admin/topics', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM topics ORDER BY name ASC');
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. Thêm Topic mới
+app.post('/api/admin/topics', async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name) return res.status(400).json({ message: "Tên chủ đề không được trống" });
+        const slug = slugify(name, { lower: true, strict: true });
+        
+        const [result] = await pool.query('INSERT INTO topics (name, slug) VALUES (?, ?)', [name, slug]);
+        res.json({ id: result.insertId, name, slug, message: "Thêm chủ đề thành công" });
+    } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: "Chủ đề đã tồn tại" });
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. Upload & Preview Excel (Đọc từ RAM trả về JSON)
+app.post('/api/admin/preview-excel', uploadExcel.single('file'), (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ message: "Vui lòng chọn file Excel" });
+        
+        const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0]; 
+        const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+        
+        res.json({ message: "Đọc file thành công", total: data.length, data: data });
+    } catch (error) { res.status(500).json({ message: "Lỗi đọc file: " + error.message }); }
+});
+
+// 4. Upload Media lên Cloudinary (Trả về URL)
+app.post('/api/admin/upload-media', uploadMedia.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ message: "Upload thất bại" });
+    res.json({ url: req.file.path, filename: req.file.filename, message: "Upload thành công" });
+});
+
+// 5. Tạo Đề Reading (Lưu DB)
+app.post('/api/admin/create-reading', async (req, res) => {
+    try {
+        const { title, content, level, topic_id, questions } = req.body;
+        
+        // 1. Lưu bài đọc (Chú ý: Cột trong DB là level_id, không phải level)
+        const [resPassage] = await pool.query(
+            `INSERT INTO reading_passages (title, content, level_id, topic_id) VALUES (?, ?, ?, ?)`, 
+            [title, content, level, topic_id]
+        );
+        const passageId = resPassage.insertId;
+
+        // 2. Lưu câu hỏi vào bảng reading_questions
+        if (questions && questions.length > 0) {
+            const sqlQ = `INSERT INTO reading_questions (passage_id, question_text, option_a, option_b, option_c, option_d, correct_answer) VALUES ?`;
+            
+            const values = questions.map(q => [
+                passageId, 
+                q.Question || q.question || q.question_text, 
+                q.OptionA || q.option_a, 
+                q.OptionB || q.option_b, 
+                q.OptionC || q.option_c, 
+                q.OptionD || q.option_d, 
+                q.Correct || q.correct || q.correct_answer
+            ]);
+            await pool.query(sqlQ, [values]);
+        }
+        res.json({ message: "Tạo đề Reading thành công!", id: passageId });
+    } catch (err) { 
+        console.error("Lỗi tạo Reading:", err);
+        res.status(500).json({ error: err.message }); 
+    }
+});
+
+// 6. Tạo Đề Listening (Lưu DB)
+app.post('/api/admin/create-listening', async (req, res) => {
+    try {
+        // 1. Nhận script_content thay vì audio_url
+        const { title, script_content, level, topic_id, questions } = req.body;
+
+        // Validate: Phải có nội dung kịch bản để AI đọc
+        if (!script_content) return res.status(400).json({ message: "Thiếu nội dung kịch bản (Script) để AI đọc" });
+
+        // 2. Lưu vào bảng listening_audios
+        // Chú ý: Insert vào cột 'script_content'
+        const [resAudio] = await pool.query(
+            `INSERT INTO listening_audios (title, script_content, level_id, topic_id) VALUES (?, ?, ?, ?)`,
+            [title, script_content, level, topic_id]
+        );
+        const audioId = resAudio.insertId;
+
+        // 3. Lưu câu hỏi vào bảng listening_questions (Giữ nguyên logic cũ)
+        if (questions && questions.length > 0) {
+            const sqlQ = `INSERT INTO listening_questions (audio_id, question_text, option_a, option_b, option_c, option_d, correct_answer) VALUES ?`;
+            
+            const values = questions.map(q => [
+                audioId, 
+                q.Question || q.question || q.question_text, 
+                q.OptionA || q.option_a, 
+                q.OptionB || q.option_b, 
+                q.OptionC || q.option_c, 
+                q.OptionD || q.option_d, 
+                q.Correct || q.correct || q.correct_answer
+            ]);
+            await pool.query(sqlQ, [values]);
+        }
+        res.json({ message: "Tạo đề Listening (AI Script) thành công!", id: audioId });
+
+    } catch (err) { 
+        console.error("Lỗi Listening:", err);
+        res.status(500).json({ error: err.message }); 
+    }
+    
+});
+// 7. Tạo Đề Writing (BỔ SUNG)
+app.post('/api/admin/create-writing', async (req, res) => {
+    try {
+        // Frontend gửi lên: title, content (nội dung đề), level, topic_id, task_type
+        const { title, content, level, topic_id, task_type } = req.body;
+        
+        // Validate
+        if (!title || !content) return res.status(400).json({ message: "Tiêu đề và nội dung đề không được trống" });
+
+        // Insert vào bảng writing_prompts
+        // Lưu ý: Cột trong DB là 'question_text', Frontend gửi là 'content' -> Cần map đúng
+        const [result] = await pool.query(
+            `INSERT INTO writing_prompts (title, question_text, level_id, topic_id, task_type) VALUES (?, ?, ?, ?, ?)`, 
+            [title, content, level, topic_id, task_type]
+        );
+        
+        res.json({ message: "Tạo đề Writing thành công!", id: result.insertId });
+    } catch (err) { 
+        console.error("Lỗi tạo Writing:", err);
+        res.status(500).json({ error: err.message }); 
+    }
+});
+// 8. Tạo Đề Speaking (BỔ SUNG - Để dùng luôn cho đủ bộ)
+app.post('/api/admin/create-speaking', async (req, res) => {
+    try {
+        // Frontend gửi lên: title, content, part, level, topic_id
+        const { title, content, part, level, topic_id } = req.body;
+        
+        // Validate
+        if (!title) return res.status(400).json({ message: "Tiêu đề không được trống" });
+
+        // Insert vào bảng speaking_questions
+        // Cấu trúc cột dựa trên ảnh bạn gửi: title, question_text, level_id (vừa thêm), topic_id, part
+        const [result] = await pool.query(
+            `INSERT INTO speaking_questions (title, question_text, level_id, topic_id, part) VALUES (?, ?, ?, ?, ?)`, 
+            [title, content, level, topic_id, part]
+        );
+        
+        res.json({ message: "Tạo đề Speaking thành công!", id: result.insertId });
+    } catch (err) { 
+        console.error("Lỗi tạo Speaking:", err); // Xem log lỗi chi tiết tại đây nếu vẫn fail
+        res.status(500).json({ error: err.message }); 
+    }
+});
+// ============================================================
 // 10. CLASS DISCUSSION (DIỄN ĐÀN LỚP HỌC)
 // ============================================================
 
@@ -1115,6 +1408,144 @@ app.post("/api/classes/:id/discussions", async (req, res) => {
     res.status(201).json({ message: "Đã gửi tin nhắn" });
   } catch (err) { res.status(500).json({ message: "Lỗi gửi tin" }); }
 });
+// ============================================================
+// 11. MOCK TEST (TỰ ĐỘNG TẠO ĐỀ THI THỬ)
+// ============================================================
+
+app.post('/api/admin/auto-generate-test', async (req, res) => {
+    try {
+        const { title, description } = req.body;
+        if (!title) return res.status(400).json({ message: "Vui lòng nhập tên đề thi" });
+
+        console.log("🔄 Đang sinh đề thi: ", title);
+
+        // --- BƯỚC 1: BỐC NGẪU NHIÊN NGUYÊN LIỆU ---
+
+        // 1. LISTENING: Lấy 1 bài nghe bất kỳ
+        const [audio] = await pool.query("SELECT id FROM listening_audios ORDER BY RAND() LIMIT 1"); 
+        const listeningId = audio.length > 0 ? audio[0].id : null; 
+
+        // 2. READING: Lấy 4 bài đọc ngẫu nhiên
+        const [readings] = await pool.query("SELECT id FROM reading_passages ORDER BY RAND() LIMIT 4");
+        const readingIds = readings.map(r => r.id);
+
+        // 3. WRITING: Lấy 1 Task 1 + 1 Task 2
+        const [wTask1] = await pool.query("SELECT id FROM writing_prompts WHERE task_type = 'task1' ORDER BY RAND() LIMIT 1");
+        const [wTask2] = await pool.query("SELECT id FROM writing_prompts WHERE task_type = 'task2' ORDER BY RAND() LIMIT 1");
+        const writingIds = [...wTask1.map(w => w.id), ...wTask2.map(w => w.id)];
+
+        // 4. SPEAKING: Lấy 1 Part 1 + 1 Part 2 + 1 Part 3
+        const [sPart1] = await pool.query("SELECT id FROM speaking_questions WHERE part = 1 ORDER BY RAND() LIMIT 1");
+        const [sPart2] = await pool.query("SELECT id FROM speaking_questions WHERE part = 2 ORDER BY RAND() LIMIT 1");
+        const [sPart3] = await pool.query("SELECT id FROM speaking_questions WHERE part = 3 ORDER BY RAND() LIMIT 1");
+        const speakingIds = [...sPart1.map(s => s.id), ...sPart2.map(s => s.id), ...sPart3.map(s => s.id)];
+
+        // --- BƯỚC 2: KIỂM TRA DỮ LIỆU ---
+        // Nếu thiếu dữ liệu (ví dụ chưa nhập đủ 4 bài đọc), hệ thống vẫn cho tạo nhưng cảnh báo
+        if (!listeningId) console.log("⚠️ Cảnh báo: Không có bài Listening nào.");
+        if (readingIds.length < 4) console.log("⚠️ Cảnh báo: Thiếu bài Reading (Cần 4).");
+
+        // --- BƯỚC 3: LƯU VÀO BẢNG mock_tests ---
+        await pool.query(
+            `INSERT INTO mock_tests (title, description, listening_id, reading_ids, writing_ids, speaking_ids) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+                title, 
+                description || `Đề tự động ngày ${new Date().toLocaleDateString()}`, 
+                listeningId, 
+                JSON.stringify(readingIds), // Chuyển mảng thành chuỗi JSON để lưu SQL
+                JSON.stringify(writingIds),
+                JSON.stringify(speakingIds)
+            ]
+        );
+
+        res.json({ 
+            message: "Tạo đề thi thành công!", 
+            stats: { 
+                reading: readingIds.length, 
+                writing: writingIds.length, 
+                speaking: speakingIds.length 
+            } 
+        });
+
+    } catch (err) {
+        console.error("Lỗi sinh đề:", err);
+        res.status(500).json({ message: "Lỗi server: " + err.message });
+    }
+});
+// 2. API Lấy danh sách Đề thi thử (Cho trang Luyện thi hiển thị)
+app.get('/api/mock-tests', async (req, res) => {
+    try {
+        // Lấy tất cả đề thi đang active, sắp xếp mới nhất lên đầu
+        const [rows] = await pool.query("SELECT * FROM mock_tests WHERE is_active = 1 ORDER BY created_at DESC");
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Lỗi tải danh sách đề thi" });
+    }
+});
+
+// 3. API Lấy chi tiết Mock Test (FULL DỮ LIỆU CÂU HỎI & ĐÁP ÁN)
+app.get('/api/mock-tests/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // 1. Lấy khung đề thi
+        const [tests] = await pool.query("SELECT * FROM mock_tests WHERE id = ?", [id]);
+        if (tests.length === 0) return res.status(404).json({ message: "Không tìm thấy đề thi" });
+        const test = tests[0];
+
+        // 2. Parse ID JSON
+        const rIds = typeof test.reading_ids === 'string' ? JSON.parse(test.reading_ids) : test.reading_ids || [];
+        const wIds = typeof test.writing_ids === 'string' ? JSON.parse(test.writing_ids) : test.writing_ids || [];
+        const sIds = typeof test.speaking_ids === 'string' ? JSON.parse(test.speaking_ids) : test.speaking_ids || [];
+
+        // --- XỬ LÝ LISTENING (Kèm câu hỏi) ---
+        let listeningData = null;
+        if (test.listening_id) {
+            const [audioRows] = await pool.query("SELECT * FROM listening_audios WHERE id = ?", [test.listening_id]);
+            if (audioRows.length > 0) {
+                listeningData = audioRows[0];
+                // Lấy câu hỏi của bài nghe này
+                const [lQuestions] = await pool.query("SELECT * FROM listening_questions WHERE audio_id = ?", [listeningData.id]);
+                listeningData.questions = lQuestions; 
+            }
+        }
+
+        // --- XỬ LÝ READING (Kèm câu hỏi) ---
+        let readingData = [];
+        if (rIds.length > 0) {
+            // Lấy các bài đọc
+            const [passages] = await pool.query(`SELECT * FROM reading_passages WHERE id IN (?)`, [rIds]);
+            // Lấy TẤT CẢ câu hỏi của các bài đọc này 1 lần (tối ưu query)
+            const [rQuestions] = await pool.query(`SELECT * FROM reading_questions WHERE passage_id IN (?)`, [rIds]);
+            
+            // Map câu hỏi vào đúng bài đọc
+            readingData = passages.map(p => ({
+                ...p,
+                questions: rQuestions.filter(q => q.passage_id === p.id)
+            }));
+        }
+
+        // --- WRITING & SPEAKING ---
+        const [writings] = wIds.length > 0 ? await pool.query(`SELECT * FROM writing_prompts WHERE id IN (?)`, [wIds]) : [[]];
+        const [speakings] = sIds.length > 0 ? await pool.query(`SELECT * FROM speaking_questions WHERE id IN (?)`, [sIds]) : [[]];
+
+        res.json({
+            id: test.id,
+            title: test.title,
+            listening: listeningData,
+            reading: readingData,
+            writing: writings,
+            speaking: speakings
+        });
+
+    } catch (err) {
+        console.error("Lỗi API Mock Test:", err);
+        res.status(500).json({ message: "Lỗi server: " + err.message });
+    }
+});
+
 // KHỞI ĐỘNG SERVER
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server chạy tại: http://localhost:${PORT}`));

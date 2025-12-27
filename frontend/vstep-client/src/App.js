@@ -4,6 +4,7 @@ import {
   Routes,
   Route,
 } from "react-router-dom";
+import { Toaster } from 'react-hot-toast'; // [MỚI] Import thư viện thông báo
 
 // Import các trang của bạn
 import TrangChu from './pages/TrangChu.jsx';
@@ -34,15 +35,26 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import Profile from './pages/Profile';
 import BecomeTeacher from './pages/BecomeTeacher';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import AdminPractice from './pages/admin/AdminPractice';
+import AdminMockTest from './pages/admin/AdminMockTest';
+import ExamSimulation from './pages/exam/ExamSimulation';
+import ExamIntro from './pages/exam/ExamIntro';
 
 function App() {
   return (
     <Router>
+      {/* [MỚI] Đặt Toaster ở đây để hiển thị thông báo trên toàn app */}
+      <Toaster position="top-right" reverseOrder={false} />
+
       <Routes>
         {/* Công khai */}
         <Route path="/" element={<TrangChu />} />
         <Route path="/dang-nhap" element={<DangNhap />} />
         <Route path="/dang-ky" element={<DangKy />} /> 
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/practice" element={<LuyenThi />} />
         <Route path="/dictionary" element={<Dictionary />} />
 
@@ -60,6 +72,8 @@ function App() {
           <Route path="/my-courses" element={<MyCourses />} />
           <Route path="/class/assignment/:id" element={<StudentAssignment />} />
           <Route path="/become-teacher" element={<BecomeTeacher />} />
+          <Route path="/exam/intro/:id" element={<ExamIntro />} />
+          <Route path="/exam/start/:id" element={<ExamSimulation />} />
           {/* class detail moved into admin area */}
           <Route path="/profile" element={<Profile />} />
           {/* === THÊM LẠI ROUTE NÀY CHO HỌC VIÊN === */}
@@ -87,6 +101,8 @@ function App() {
             <Route path="class/:id" element={<ClassDetail />} />
             <Route path="assignment/:id" element={<AssignmentDetail />} />
             <Route path="users" element={<UserManagement />} />
+            <Route path="/admin/create-practice" element={<AdminPractice />} />
+            <Route path="/admin/mock-test" element={<AdminMockTest />} />
           </Route>
         </Route>
 

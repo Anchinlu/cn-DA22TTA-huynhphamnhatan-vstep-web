@@ -3,11 +3,13 @@ import {
   User, Mail, Calendar, LogOut, 
   Trophy, Target, Clock, Activity,
   Headphones, BookOpen, PenTool, Mic,
-  History // <--- Đã thêm icon này vào import
+  History
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+// [MỚI] Import toast
+import toast from 'react-hot-toast';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -17,7 +19,7 @@ const Profile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       const token = localStorage.getItem('vstep_token');
-      if (!token) { navigate('/login'); return; }
+      if (!token) { navigate('/dang-nhap'); return; }
 
       try {
         const res = await fetch('http://localhost:5000/api/profile/stats', {
@@ -25,9 +27,12 @@ const Profile = () => {
         });
         if (res.ok) {
           setData(await res.json());
+        } else {
+            toast.error("Không thể tải thông tin hồ sơ.");
         }
       } catch (err) {
         console.error(err);
+        toast.error("Lỗi kết nối.");
       } finally {
         setLoading(false);
       }
@@ -38,7 +43,8 @@ const Profile = () => {
   const handleLogout = () => {
     localStorage.removeItem('vstep_token');
     localStorage.removeItem('vstep_user');
-    navigate('/login');
+    toast.success("Đã đăng xuất thành công!");
+    navigate('/dang-nhap');
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-500">Đang tải hồ sơ...</div>;
@@ -107,7 +113,7 @@ const Profile = () => {
                 />
               </div>
 
-              {/* BIỂU ĐỒ (Giả lập bằng Progress Bar) */}
+              {/* BIỂU ĐỒ */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="font-bold text-gray-800 mb-4">Biểu đồ tiến bộ</h3>
                 <div className="space-y-4">
@@ -140,7 +146,7 @@ const Profile = () => {
                   <p className="text-gray-400 text-sm text-center py-4">Chưa có hoạt động nào.</p>
                 )}
               </div>
-              <button onClick={() => navigate('/luyen-thi')} className="w-full mt-6 py-2 bg-gray-100 text-gray-600 font-bold rounded-lg hover:bg-gray-200 transition text-sm">
+              <button onClick={() => navigate('/practice')} className="w-full mt-6 py-2 bg-gray-100 text-gray-600 font-bold rounded-lg hover:bg-gray-200 transition text-sm">
                 Luyện tập ngay
               </button>
             </div>

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GraduationCap, Upload, CheckCircle2, AlertCircle, ArrowLeft, Phone, Link as LinkIcon, BookOpen } from 'lucide-react';
+import { GraduationCap, Upload, CheckCircle2, ArrowLeft, Phone, Link as LinkIcon, BookOpen, AlertCircle } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+// [MỚI] Import toast
+import toast from 'react-hot-toast';
 
 const BecomeTeacher = () => {
   const navigate = useNavigate();
@@ -19,7 +21,13 @@ const BecomeTeacher = () => {
     setStatus('loading');
     
     const token = localStorage.getItem('vstep_token');
-    if (!token) { navigate('/login'); return; }
+    
+    // [MỚI] Kiểm tra đăng nhập và thông báo
+    if (!token) { 
+        toast.error("Vui lòng đăng nhập để gửi hồ sơ!");
+        navigate('/dang-nhap'); // [SỬA] Sửa route từ /login thành /dang-nhap
+        return; 
+    }
 
     try {
       const res = await fetch('http://localhost:5000/api/teacher-request', {
@@ -32,14 +40,18 @@ const BecomeTeacher = () => {
       });
       
       const data = await res.json();
+      
       if (res.ok) {
         setStatus('success');
+        toast.success("Gửi hồ sơ thành công!"); // [MỚI] Thông báo thành công
       } else {
-        alert(data.message);
+        // [MỚI] Thay alert bằng toast error
+        toast.error(data.message || "Có lỗi xảy ra khi gửi hồ sơ.");
         setStatus('error');
       }
     } catch (err) {
       console.error(err);
+      toast.error("Lỗi kết nối đến máy chủ.");
       setStatus('error');
     }
   };
@@ -49,7 +61,7 @@ const BecomeTeacher = () => {
       <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
         <Header />
         <div className="flex-grow flex items-center justify-center p-6">
-            <div className="bg-white p-10 rounded-3xl shadow-xl text-center max-w-md w-full border border-green-100">
+            <div className="bg-white p-10 rounded-3xl shadow-xl text-center max-w-md w-full border border-green-100 animate-fade-in-up">
                 <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce-slow">
                     <CheckCircle2 className="w-10 h-10 text-green-600" />
                 </div>

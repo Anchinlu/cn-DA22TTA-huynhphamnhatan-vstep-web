@@ -12,27 +12,46 @@ const ReadingDashboard = () => {
   
   // State quản lý bộ lọc
   const [selectedLevel, setSelectedLevel] = useState('B1');
-  const [selectedTopic, setSelectedTopic] = useState('daily_life');
+  const [selectedTopicId, setSelectedTopicId] = useState(''); // Sửa thành ID số
   
   // Data từ API
   const [tests, setTests] = useState([]);
   const [history, setHistory] = useState([]);
+  const [topics, setTopics] = useState([]); // State lưu topics từ DB
   const [loading, setLoading] = useState(false);
 
-  // Danh sách chủ đề (Khớp với topic_id trong Database)
-  const topics = [
-    { id: 'daily_life', name: 'Đời sống thường ngày', icon: '☕' },
-    { id: 'education', name: 'Giáo dục & Học tập', icon: '📚' },
-    { id: 'travel', name: 'Du lịch & Văn hóa', icon: '🌍' },
-    { id: 'technology', name: 'Khoa học & Công nghệ', icon: '💻' },
-  ];
+  // Map icon thủ công (để hiển thị cho đẹp)
+  const getTopicIcon = (slug) => {
+    if (slug?.includes('doi-song') || slug?.includes('daily')) return '☕';
+    if (slug?.includes('giao-duc') || slug?.includes('edu')) return '📚';
+    if (slug?.includes('du-lich') || slug?.includes('travel')) return '🌍';
+    if (slug?.includes('cong-nghe') || slug?.includes('tech')) return '💻';
+    return '📝'; // Icon mặc định
+  };
 
-  // 1. Fetch danh sách đề khi chọn Level/Topic
+  // 1. Fetch danh sách Topics từ Server (FIX QUAN TRỌNG)
   useEffect(() => {
+    fetch('http://localhost:5000/api/admin/topics')
+      .then(res => res.json())
+      .then(data => {
+        setTopics(data);
+        // Tự động chọn topic đầu tiên nếu có
+        if (data.length > 0 && !selectedTopicId) {
+            setSelectedTopicId(data[0].id);
+        }
+      })
+      .catch(err => console.error("Lỗi load topics:", err));
+  }, []);
+
+  // 2. Fetch danh sách đề (Dùng ID thật từ DB)
+  useEffect(() => {
+    if (!selectedTopicId) return; // Chưa có topic thì chưa load
+
     const fetchTests = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`http://localhost:5000/api/reading/list?level=${selectedLevel}&topic=${selectedTopic}`);
+        // Gửi selectedTopicId (là số 1, 2, 3...) lên server
+        const res = await fetch(`http://localhost:5000/api/reading/list?level=${selectedLevel}&topic=${selectedTopicId}`);
         if(res.ok) {
             const data = await res.json();
             setTests(data); 
@@ -46,9 +65,9 @@ const ReadingDashboard = () => {
       }
     };
     fetchTests();
-  }, [selectedLevel, selectedTopic]);
+  }, [selectedLevel, selectedTopicId]);
 
-  // 2. Fetch lịch sử làm bài Reading
+  // 3. Fetch lịch sử (Giữ nguyên)
   useEffect(() => {
     const fetchHistory = async () => {
         const token = localStorage.getItem('vstep_token');
@@ -63,9 +82,11 @@ const ReadingDashboard = () => {
     fetchHistory();
   }, []);
 
-  // Chuyển sang trang làm bài với ID cụ thể
   const handleStartTest = (testId) => {
-    navigate('/practice/reading/start', { state: { level: selectedLevel, topic: selectedTopic, testId: testId } });
+    // Truyền thêm cả topicId để tiện xử lý
+    navigate('/practice/reading/start', { 
+        state: { level: selectedLevel, topicId: selectedTopicId, testId: testId } 
+    });
   };
 
   return (
@@ -75,27 +96,23 @@ const ReadingDashboard = () => {
       <main className="flex-grow pt-24 pb-12 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* --- CỘT TRÁI: BỘ LỌC & DANH SÁCH ĐỀ (2/3) --- */}
           <div className="lg:col-span-2 space-y-8">
             
-            {/* 1. Header Section (Màu Emerald cho Reading) */}
+            {/* Header giữ nguyên */}
             <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
                 <div className="relative z-10">
                     <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
                         <BookOpen className="w-8 h-8"/> Luyện Đọc VSTEP
                     </h1>
                     <p className="text-emerald-100 opacity-90 max-w-lg">
-                        Nâng cao kỹ năng đọc hiểu qua các bài văn đa dạng chủ đề. Hệ thống tự động lưu kết quả.
+                        Nâng cao kỹ năng đọc hiểu qua các bài văn đa dạng chủ đề.
                     </p>
                 </div>
-                <div className="absolute right-0 bottom-0 opacity-10">
-                    <BookOpen size={150} />
-                </div>
+                <div className="absolute right-0 bottom-0 opacity-10"><BookOpen size={150} /></div>
             </div>
 
-            {/* 2. Bộ lọc Trình độ & Chủ đề */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="font-bold text-gray-800 mb-4">1. Chọn trình độ mục tiêu</h3>
+                <h3 className="font-bold text-gray-800 mb-4">1. Chọn trình độ</h3>
                 <div className="grid grid-cols-3 gap-4 mb-8">
                     {['B1', 'B2', 'C1'].map(level => (
                         <button 
@@ -103,7 +120,7 @@ const ReadingDashboard = () => {
                             onClick={() => setSelectedLevel(level)}
                             className={`py-3 rounded-xl font-bold transition-all border-2 ${
                                 selectedLevel === level 
-                                ? 'border-emerald-600 bg-emerald-50 text-emerald-700 shadow-sm' 
+                                ? 'border-emerald-600 bg-emerald-50 text-emerald-700' 
                                 : 'border-gray-100 text-gray-500 hover:border-gray-300'
                             }`}
                         >
@@ -112,47 +129,50 @@ const ReadingDashboard = () => {
                     ))}
                 </div>
 
-                <h3 className="font-bold text-gray-800 mb-4">2. Chọn chủ đề luyện tập</h3>
+                <h3 className="font-bold text-gray-800 mb-4">2. Chọn chủ đề</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {topics.map(t => (
+                    {/* Render Topics từ DB */}
+                    {topics.length > 0 ? topics.map(t => (
                         <button
                             key={t.id}
-                            onClick={() => setSelectedTopic(t.id)}
+                            onClick={() => setSelectedTopicId(t.id)}
                             className={`p-4 rounded-xl text-left transition-all border ${
-                                selectedTopic === t.id
+                                selectedTopicId === t.id
                                 ? 'border-emerald-500 ring-1 ring-emerald-500 bg-white shadow-md'
                                 : 'border-gray-200 hover:bg-gray-50'
                             }`}
                         >
-                            <span className="text-xl mr-3">{t.icon}</span>
-                            <span className={`font-medium ${selectedTopic === t.id ? 'text-emerald-700' : 'text-gray-700'}`}>
+                            <span className="text-xl mr-3">{getTopicIcon(t.slug)}</span>
+                            <span className={`font-medium ${selectedTopicId === t.id ? 'text-emerald-700' : 'text-gray-700'}`}>
                                 {t.name}
                             </span>
                         </button>
-                    ))}
+                    )) : (
+                        <p className="text-gray-400 text-sm col-span-2 text-center">Đang tải chủ đề hoặc chưa có dữ liệu...</p>
+                    )}
                 </div>
             </div>
 
-            {/* 3. Danh sách Đề thi */}
+            {/* Danh sách đề thi */}
             <div>
                 <h3 className="font-bold text-xl text-gray-800 mb-4 flex items-center gap-2">
                     <span className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm">3</span>
-                    Danh sách bài đọc có sẵn
+                    Danh sách bài đọc
                 </h3>
                 
                 {loading ? (
-                    <div className="text-center py-10 text-gray-400">Đang tải dữ liệu...</div>
+                    <div className="text-center py-10 text-gray-400">Đang tìm bài đọc phù hợp...</div>
                 ) : tests.length > 0 ? (
                     <div className="grid grid-cols-1 gap-4">
                         {tests.map((test, index) => (
                             <div key={test.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex items-center justify-between group">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                    <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
                                         {index + 1}
                                     </div>
                                     <div>
                                         <h4 className="font-bold text-gray-800 text-lg group-hover:text-emerald-600 transition-colors">
-                                            {test.title || `Bài đọc số ${index + 1}`}
+                                            {test.title}
                                         </h4>
                                         <div className="flex gap-4 text-xs text-gray-500 mt-1">
                                             <span className="flex items-center gap-1"><Clock size={14}/> 60 phút</span>
@@ -162,7 +182,7 @@ const ReadingDashboard = () => {
                                 </div>
                                 <button 
                                     onClick={() => handleStartTest(test.id)}
-                                    className="px-6 py-2.5 bg-white border-2 border-emerald-600 text-emerald-600 font-bold rounded-lg hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-2"
+                                    className="px-6 py-2.5 border-2 border-emerald-600 text-emerald-600 font-bold rounded-lg hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-2"
                                 >
                                     Làm bài <ChevronRight size={18}/>
                                 </button>
@@ -172,19 +192,18 @@ const ReadingDashboard = () => {
                 ) : (
                     <div className="bg-white p-8 rounded-xl text-center border border-dashed border-gray-300">
                         <AlertCircle className="w-10 h-10 text-gray-300 mx-auto mb-2"/>
-                        <p className="text-gray-500">Chưa có bài đọc nào cho chủ đề này.</p>
+                        <p className="text-gray-500">Chưa có bài đọc nào cho Topic và Trình độ này.</p>
                     </div>
                 )}
             </div>
           </div>
 
-          {/* --- CỘT PHẢI: LỊCH SỬ & THỐNG KÊ (1/3) --- */}
+          {/* CỘT PHẢI (LỊCH SỬ) - Giữ nguyên logic */}
           <div className="space-y-6">
-            
-            {/* Thẻ thống kê nhanh */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+             {/* ... Code phần thống kê & lịch sử giữ nguyên ... */}
+             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <BarChart3 size={20} className="text-orange-500"/> Thống kê Reading
+                    <BarChart3 size={20} className="text-orange-500"/> Thống kê
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="bg-orange-50 p-4 rounded-xl text-center">
@@ -200,9 +219,8 @@ const ReadingDashboard = () => {
                 </div>
             </div>
 
-            {/* Bảng Lịch sử */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                <div className="p-5 border-b border-gray-100 bg-gray-50">
                     <h4 className="font-bold text-gray-800 flex items-center gap-2">
                         <History size={18} className="text-gray-500"/> Lịch sử làm bài
                     </h4>
@@ -213,26 +231,16 @@ const ReadingDashboard = () => {
                             {history.map((h, i) => (
                                 <div key={i} className="p-4 hover:bg-gray-50 transition-colors">
                                     <div className="flex justify-between items-center mb-1">
-                                        <span className="font-bold text-sm text-gray-800 truncate max-w-[180px]" title={h.tieu_de_bai_thi}>
-                                            {h.tieu_de_bai_thi || "Bài đọc luyện tập"}
-                                        </span>
-                                        <span className={`font-bold ${h.diem_so >= 5 ? 'text-green-600' : 'text-red-500'}`}>
-                                            {h.diem_so}/10
-                                        </span>
+                                        <span className="font-bold text-sm text-gray-800 truncate max-w-[150px]">{h.tieu_de_bai_thi}</span>
+                                        <span className={`font-bold ${h.diem_so >= 5 ? 'text-green-600' : 'text-red-500'}`}>{h.diem_so}</span>
                                     </div>
-                                    <div className="flex justify-between items-center text-xs text-gray-400">
-                                        <span>{h.ngay_lam}</span>
-                                        <span>⏱ {Math.round(h.thoi_gian_lam / 60)} phút</span>
-                                    </div>
+                                    <div className="text-xs text-gray-400">{h.ngay_lam}</div>
                                 </div>
                             ))}
                         </div>
-                    ) : (
-                        <div className="p-8 text-center text-gray-400 text-sm">Chưa có dữ liệu lịch sử.</div>
-                    )}
+                    ) : <div className="p-4 text-center text-gray-400 text-sm">Chưa có dữ liệu</div>}
                 </div>
             </div>
-
           </div>
 
         </div>

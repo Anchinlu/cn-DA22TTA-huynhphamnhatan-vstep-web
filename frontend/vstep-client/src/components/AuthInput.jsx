@@ -16,9 +16,11 @@ const AuthInput = ({
 
   return (
     <div className="w-full mb-5">
-      <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
-        {label}
-      </label>
+      {label && (
+        <label className="block text-sm font-semibold text-slate-700 mb-1.5 ml-1">
+          {label}
+        </label>
+      )}
       
       <div 
         className={`
@@ -31,10 +33,12 @@ const AuthInput = ({
           }
         `}
       >
-        {/* Icon bên trái */}
-        <div className={`pl-4 transition-colors ${isFocused ? 'text-blue-600' : 'text-slate-400'}`}>
-          <Icon size={20} />
-        </div>
+        {/* [SỬA LỖI] Chỉ hiển thị Icon nếu nó tồn tại */}
+        {Icon && (
+          <div className={`pl-4 transition-colors ${isFocused ? 'text-blue-600' : 'text-slate-400'}`}>
+            <Icon size={20} />
+          </div>
+        )}
 
         {/* Input */}
         <input

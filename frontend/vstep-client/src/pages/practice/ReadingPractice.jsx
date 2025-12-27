@@ -5,6 +5,8 @@ import {
   Globe, Lightbulb, Type, AlertCircle
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+// [MỚI] Import toast
+import toast from 'react-hot-toast';
 
 const ReadingPractice = () => {
   const navigate = useNavigate();
@@ -45,6 +47,7 @@ const ReadingPractice = () => {
       setTestData(data);
     } catch (err) {
       setError(err.message);
+      toast.error("Lỗi tải đề thi: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -64,7 +67,8 @@ const ReadingPractice = () => {
         const answeredQ = Object.keys(answers).length;
         if (answeredQ < totalQ) {
             const missing = totalQ - answeredQ;
-            alert(`⚠️ Bạn còn ${missing} câu chưa trả lời! Vui lòng hoàn thành trước khi nộp.`);
+            // [MỚI] Toast cảnh báo
+            toast.error(`⚠️ Bạn còn ${missing} câu chưa trả lời!`, { duration: 4000 });
             return;
         }
     }
@@ -93,7 +97,12 @@ const ReadingPractice = () => {
                     duration: (60 * 60) - timeLeft,
                     testTitle: displayTitle 
                 })
-            }).catch(e => console.error(e));
+            })
+            .then(() => toast.success(`Đã lưu kết quả: ${finalScore}/10 điểm!`))
+            .catch(e => {
+                console.error(e);
+                toast.error("Lỗi lưu kết quả");
+            });
         }
         
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -101,13 +110,31 @@ const ReadingPractice = () => {
 
     if (force) {
         processSubmit();
-    } else if (window.confirm("Nộp bài ngay?")) {
-        processSubmit();
+    } else {
+        // [MỚI] Toast xác nhận nộp bài
+        toast((t) => (
+          <div className="flex flex-col gap-2">
+            <span className="font-bold">Bạn chắc chắn muốn nộp bài?</span>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => { toast.dismiss(t.id); processSubmit(); }}
+                className="bg-indigo-600 text-white px-3 py-1 rounded text-sm font-bold"
+              >
+                Nộp luôn
+              </button>
+              <button 
+                onClick={() => toast.dismiss(t.id)}
+                className="bg-gray-200 px-3 py-1 rounded text-sm"
+              >
+                Xem lại
+              </button>
+            </div>
+          </div>
+        ), { duration: 5000, icon: '❓' });
     }
   }, [isSubmitted, testData, answers, level, timeLeft]);
 
   // 2. TIMER & AUTO SUBMIT
-  // Tách logic đếm ngược ra khỏi logic submit để tránh stale closure và vòng lặp
   useEffect(() => {
     if (!isStarted || isSubmitted) return;
     
@@ -129,6 +156,7 @@ const ReadingPractice = () => {
   useEffect(() => {
       if (timeLeft === 0 && isStarted && !isSubmitted) {
           handleSubmit(true); 
+          toast("Hết giờ làm bài!", { icon: '⏰' });
       }
   }, [timeLeft, isStarted, isSubmitted, handleSubmit]);
 
@@ -145,13 +173,34 @@ const ReadingPractice = () => {
     setAnswers(prev => ({ ...prev, [qId]: option }));
   };
 
-  const handleStart = () => setIsStarted(true);
+  const handleStart = () => {
+      setIsStarted(true);
+      toast.success("Bắt đầu làm bài!");
+  };
 
   const handleExit = () => {
     if (isSubmitted) { navigate('/practice/reading'); return; }
-    if (window.confirm("Bạn đang làm bài. Thoát sẽ mất kết quả. Bạn chắc chắn chứ?")) {
-      navigate('/practice/reading');
-    }
+    
+    // [MỚI] Toast xác nhận thoát
+    toast((t) => (
+      <div className="flex flex-col gap-2">
+        <span className="font-bold text-red-600">Thoát sẽ mất kết quả?</span>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => { toast.dismiss(t.id); navigate('/practice/reading'); }}
+            className="bg-red-600 text-white px-3 py-1 rounded text-sm font-bold"
+          >
+            Thoát
+          </button>
+          <button 
+            onClick={() => toast.dismiss(t.id)}
+            className="bg-gray-200 px-3 py-1 rounded text-sm"
+          >
+            Ở lại
+          </button>
+        </div>
+      </div>
+    ), { duration: 4000 });
   };
 
   // AI Explain
@@ -172,15 +221,15 @@ const ReadingPractice = () => {
       });
       const data = await res.json();
       setAiExplanations(prev => ({ ...prev, [questionId]: data }));
-    } catch (err) { alert("Lỗi AI: " + err.message); } 
-    finally { setExplainingId(null); }
+    } catch (err) { 
+        toast.error("Lỗi AI: " + err.message);
+    } finally { setExplainingId(null); }
   };
 
-  // Helper render an toàn (Tránh lỗi Objects are not valid as a React child)
+  // Helper render an toàn
   const renderSafeText = (content) => {
       if (typeof content === 'string') return content;
       if (typeof content === 'object' && content !== null) {
-          // Nếu là object, thử lấy thuộc tính text hoặc message, hoặc stringify
           return content.text || content.message || content.explanation || JSON.stringify(content);
       }
       return "";
@@ -209,7 +258,7 @@ const ReadingPractice = () => {
   if (!isStarted) {
     return (
       <div className="h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
-        <div className="bg-white max-w-2xl w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
+        <div className="bg-white max-w-2xl w-full rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-fade-in-up">
           {/* Left Decor */}
           <div className="bg-indigo-600 w-full md:w-1/3 p-8 flex flex-col justify-between text-white relative overflow-hidden">
              <div className="absolute top-0 left-0 w-full h-full bg-indigo-900/20 z-0"></div>
@@ -375,7 +424,7 @@ const ReadingPractice = () => {
                   })}
                 </div>
 
-                {/* AI Explain Card - ĐÃ FIX LỖI RENDER OBJECT */}
+                {/* AI Explain Card */}
                 {showResult && (
                   <div className="mt-6 ml-12 pt-6 border-t border-dashed border-slate-200">
                     {aiExplanations[q.id] ? (
@@ -393,7 +442,6 @@ const ReadingPractice = () => {
                               <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase mb-1"><Lightbulb size={12}/> Giải thích</div>
                               <p className="text-slate-800 text-sm">{renderSafeText(aiExplanations[q.id].explanation)}</p>
                            </div>
-                           {/* Render từ vựng nếu có */}
                            {Array.isArray(aiExplanations[q.id].key_vocabulary) && (
                              <div className="flex flex-wrap gap-2 mt-2">
                                {aiExplanations[q.id].key_vocabulary.map((v, i) => (

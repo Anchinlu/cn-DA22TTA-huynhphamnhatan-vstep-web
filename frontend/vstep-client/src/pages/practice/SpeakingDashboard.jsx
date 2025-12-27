@@ -13,14 +13,15 @@ const SpeakingDashboard = () => {
   
   // State quản lý lựa chọn
   const [selectedPart, setSelectedPart] = useState('1'); // 1, 2, 3
-  const [selectedTopic, setSelectedTopic] = useState('daily_life');
+  const [selectedTopicId, setSelectedTopicId] = useState(''); // ID số từ DB
 
   // State dữ liệu
   const [tests, setTests] = useState([]);
   const [history, setHistory] = useState([]);
+  const [topics, setTopics] = useState([]); // Danh sách chủ đề từ API
   const [loading, setLoading] = useState(false);
 
-  // Cấu hình Parts
+  // Cấu hình Parts (Giữ nguyên vì đây là hằng số giao diện)
   const parts = [
     { 
       id: '1', 
@@ -45,22 +46,39 @@ const SpeakingDashboard = () => {
     },
   ];
 
-  // Danh sách chủ đề
-  const topics = [
-    { id: 'daily_life', name: 'Đời sống', icon: BookOpen },
-    { id: 'education', name: 'Giáo dục', icon: BookOpen },
-    { id: 'technology', name: 'Công nghệ', icon: Cpu },
-    { id: 'business', name: 'Kinh tế', icon: Briefcase },
-    { id: 'environment', name: 'Môi trường', icon: Globe },
-    { id: 'travel', name: 'Du lịch', icon: Zap },
-  ];
+  // Helper map icon cho topic (Vì DB chưa lưu icon)
+  const getTopicIcon = (slug) => {
+      if (slug?.includes('doi-song') || slug?.includes('daily')) return <BookOpen size={16}/>;
+      if (slug?.includes('cong-nghe') || slug?.includes('tech')) return <Cpu size={16}/>;
+      if (slug?.includes('kinh-te') || slug?.includes('business')) return <Briefcase size={16}/>;
+      if (slug?.includes('moi-truong') || slug?.includes('environment')) return <Globe size={16}/>;
+      if (slug?.includes('du-lich') || slug?.includes('travel')) return <Zap size={16}/>;
+      return <BookOpen size={16}/>;
+  };
 
-  // 1. Fetch Danh sách đề thi
+  // 1. Fetch Danh sách Topics (MỚI)
   useEffect(() => {
+    fetch('http://localhost:5000/api/admin/topics')
+      .then(res => res.json())
+      .then(data => {
+        setTopics(data);
+        // Tự động chọn topic đầu tiên nếu có
+        if (data.length > 0 && !selectedTopicId) {
+            setSelectedTopicId(data[0].id);
+        }
+      })
+      .catch(err => console.error("Lỗi load topics:", err));
+  }, []);
+
+  // 2. Fetch Danh sách đề thi
+  useEffect(() => {
+    if (!selectedTopicId) return;
+
     const fetchTests = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`http://localhost:5000/api/speaking/list?part=${selectedPart}&topic=${selectedTopic}`);
+        // Gọi API với ID số thực tế
+        const res = await fetch(`http://localhost:5000/api/speaking/list?part=${selectedPart}&topic=${selectedTopicId}`);
         if(res.ok) {
             const data = await res.json();
             setTests(data);
@@ -74,9 +92,9 @@ const SpeakingDashboard = () => {
       }
     };
     fetchTests();
-  }, [selectedPart, selectedTopic]);
+  }, [selectedPart, selectedTopicId]);
 
-  // 2. Fetch Lịch sử
+  // 3. Fetch Lịch sử
   useEffect(() => {
     const fetchHistory = async () => {
         const token = localStorage.getItem('vstep_token');
@@ -95,7 +113,7 @@ const SpeakingDashboard = () => {
     navigate('/practice/speaking/test', { 
       state: { 
         part: selectedPart, 
-        topic: selectedTopic, 
+        topicId: selectedTopicId, // Truyền ID số
         testId: testId 
       } 
     });
@@ -156,18 +174,20 @@ const SpeakingDashboard = () => {
                     {/* 2. Chọn Chủ đề */}
                     <h3 className="font-bold text-gray-800 mb-4">2. Chọn chủ đề</h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {topics.map(t => (
+                        {topics.length > 0 ? topics.map(t => (
                             <button 
                                 key={t.id}
-                                onClick={() => setSelectedTopic(t.id)}
+                                onClick={() => setSelectedTopicId(t.id)}
                                 className={`p-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2
-                                    ${selectedTopic === t.id 
+                                    ${selectedTopicId === t.id 
                                     ? 'bg-orange-600 text-white border-orange-600 shadow-md' 
                                     : 'border-gray-200 text-gray-600 hover:bg-orange-50 hover:border-orange-200'}`}
                             >
-                                <t.icon size={16}/> {t.name}
+                                {getTopicIcon(t.slug)} {t.name}
                             </button>
-                        ))}
+                        )) : (
+                            <p className="text-gray-400 text-sm col-span-3 text-center">Đang tải chủ đề...</p>
+                        )}
                     </div>
                 </div>
 

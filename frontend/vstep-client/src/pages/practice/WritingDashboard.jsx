@@ -13,15 +13,16 @@ const WritingDashboard = () => {
   
   // State quản lý lựa chọn
   const [selectedTask, setSelectedTask] = useState('task1'); // task1 / task2
-  const [selectedTopic, setSelectedTopic] = useState('daily_life');
   const [selectedLevel, setSelectedLevel] = useState('B1');
+  const [selectedTopicId, setSelectedTopicId] = useState(''); // ID số từ DB
 
   // State dữ liệu
   const [tests, setTests] = useState([]);
   const [history, setHistory] = useState([]);
+  const [topics, setTopics] = useState([]); // Danh sách chủ đề từ API
   const [loading, setLoading] = useState(false);
 
-  // Cấu hình Task
+  // Cấu hình Task (Giữ nguyên vì đây là hằng số giao diện)
   const tasks = [
     { 
       id: 'task1', 
@@ -39,23 +40,29 @@ const WritingDashboard = () => {
     },
   ];
 
-  // Danh sách chủ đề
-  const topics = [
-    { id: 'daily_life', name: 'Đời sống', icon: BookOpen },
-    { id: 'education', name: 'Giáo dục', icon: BookOpen },
-    { id: 'technology', name: 'Công nghệ', icon: Cpu },
-    { id: 'business', name: 'Kinh tế', icon: Briefcase },
-    { id: 'environment', name: 'Môi trường', icon: Globe },
-    { id: 'travel', name: 'Du lịch', icon: Zap },
-  ];
-
-  // 1. Fetch Danh sách đề thi (List)
+  // 1. Fetch Danh sách Topics (MỚI)
   useEffect(() => {
+    fetch('http://localhost:5000/api/admin/topics')
+      .then(res => res.json())
+      .then(data => {
+        setTopics(data);
+        // Tự động chọn topic đầu tiên nếu có
+        if (data.length > 0 && !selectedTopicId) {
+            setSelectedTopicId(data[0].id);
+        }
+      })
+      .catch(err => console.error("Lỗi load topics:", err));
+  }, []);
+
+  // 2. Fetch Danh sách đề thi (List)
+  useEffect(() => {
+    if (!selectedTopicId) return; // Chưa có topic thì chưa load
+
     const fetchTests = async () => {
       setLoading(true);
       try {
-        // Gọi API lấy danh sách đề theo bộ lọc
-        const res = await fetch(`http://localhost:5000/api/writing/list?level=${selectedLevel}&topic=${selectedTopic}&task=${selectedTask}`);
+        // Gọi API với ID số thực tế
+        const res = await fetch(`http://localhost:5000/api/writing/list?level=${selectedLevel}&topic=${selectedTopicId}&task=${selectedTask}`);
         if(res.ok) {
             const data = await res.json();
             setTests(data);
@@ -69,9 +76,9 @@ const WritingDashboard = () => {
       }
     };
     fetchTests();
-  }, [selectedLevel, selectedTopic, selectedTask]);
+  }, [selectedLevel, selectedTopicId, selectedTask]);
 
-  // 2. Fetch Lịch sử làm bài
+  // 3. Fetch Lịch sử làm bài
   useEffect(() => {
     const fetchHistory = async () => {
         const token = localStorage.getItem('vstep_token');
@@ -87,13 +94,12 @@ const WritingDashboard = () => {
   }, []);
 
   const handleStart = (testId) => {
-    // Chuyển sang trang làm bài kèm theo ID cụ thể
     navigate('/practice/writing/test', { 
       state: { 
         task: selectedTask, 
-        topic: selectedTopic, 
+        topicId: selectedTopicId, // Truyền ID số
         level: selectedLevel,
-        testId: testId // <--- Truyền ID đề thi
+        testId: testId 
       } 
     });
   };
@@ -162,11 +168,15 @@ const WritingDashboard = () => {
                         <div>
                             <h3 className="font-bold text-gray-800 mb-3">3. Chủ đề</h3>
                             <select 
-                                value={selectedTopic} 
-                                onChange={(e) => setSelectedTopic(e.target.value)}
+                                value={selectedTopicId} 
+                                onChange={(e) => setSelectedTopicId(e.target.value)}
                                 className="w-full p-2.5 rounded-lg border border-gray-300 font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
                             >
-                                {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                {topics.length > 0 ? (
+                                    topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)
+                                ) : (
+                                    <option>Đang tải chủ đề...</option>
+                                )}
                             </select>
                         </div>
                     </div>

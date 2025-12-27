@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { User, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { User, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import AuthInput from '../components/AuthInput';
+// [MỚI] Import toast
+import toast from 'react-hot-toast';
 
 // Component Logo Google
 const GoogleIcon = () => (
@@ -14,6 +16,8 @@ const GoogleIcon = () => (
 );
 
 const DangKy = () => {
+  const navigate = useNavigate(); // [MỚI] Dùng hook điều hướng
+  
   const [formData, setFormData] = useState({
     ho_ten: '',
     email: '',
@@ -21,8 +25,6 @@ const DangKy = () => {
     confirmPassword: ''
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -31,17 +33,15 @@ const DangKy = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
-    setSuccess(null);
 
     // Validate
     if (!formData.ho_ten || !formData.email || !formData.mat_khau) {
-        setError('Vui lòng điền đầy đủ thông tin.');
+        toast.error('Vui lòng điền đầy đủ thông tin.');
         setLoading(false);
         return;
     }
     if (formData.mat_khau !== formData.confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp.');
+      toast.error('Mật khẩu xác nhận không khớp.');
       setLoading(false);
       return;
     }
@@ -60,10 +60,15 @@ const DangKy = () => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
 
-      setSuccess("Đăng ký thành công! Đang chuyển hướng...");
-      setTimeout(() => { window.location.href = '/dang-nhap'; }, 1500);
+      // [MỚI] Thông báo thành công & Chuyển trang
+      toast.success("Đăng ký thành công! Đang chuyển hướng...");
+      
+      setTimeout(() => { 
+        navigate('/dang-nhap'); 
+      }, 1500);
+
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message || "Đăng ký thất bại");
     } finally {
       setLoading(false);
     }
@@ -107,7 +112,7 @@ const DangKy = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             
-            {/* Họ tên (Đã chuyển về full width) */}
+            {/* Họ tên */}
             <AuthInput 
               label="Họ và tên" 
               icon={User} 
@@ -130,7 +135,7 @@ const DangKy = () => {
               required 
             />
 
-            {/* Mật khẩu & Xác nhận (Giữ 2 cột cho gọn) */}
+            {/* Mật khẩu & Xác nhận */}
             <div className="grid grid-cols-2 gap-4">
               <AuthInput 
                 label="Mật khẩu" 
@@ -152,9 +157,7 @@ const DangKy = () => {
               />
             </div>
 
-            {error && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">{error}</p>}
-            {success && <p className="text-green-600 text-sm text-center bg-green-50 p-2 rounded-lg">{success}</p>}
-
+            {/* Nút Đăng ký */}
             <button
               type="submit"
               disabled={loading}

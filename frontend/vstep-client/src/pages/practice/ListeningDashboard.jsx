@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Headphones, Clock, BarChart3, PlayCircle, 
-  CheckCircle2, History, ChevronRight 
+  CheckCircle2, History, ChevronRight, AlertCircle 
 } from 'lucide-react';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
@@ -12,33 +12,51 @@ const ListeningDashboard = () => {
   
   // State quản lý bộ lọc
   const [selectedLevel, setSelectedLevel] = useState('B1');
-  const [selectedTopic, setSelectedTopic] = useState('daily_life');
+  const [selectedTopicId, setSelectedTopicId] = useState(''); // Sửa thành ID số từ DB
   
   // Data từ API
   const [tests, setTests] = useState([]);
   const [history, setHistory] = useState([]);
+  const [topics, setTopics] = useState([]); // State lưu danh sách chủ đề từ DB
   const [loading, setLoading] = useState(false);
 
-  // Danh sách chủ đề cố định (Hoặc có thể fetch từ DB nếu muốn)
-  const topics = [
-    { id: 'daily_life', name: 'Đời sống thường ngày', icon: '☕' },
-    { id: 'education', name: 'Giáo dục & Học tập', icon: '📚' },
-    { id: 'travel', name: 'Du lịch & Văn hóa', icon: '🌍' },
-    { id: 'technology', name: 'Khoa học & Công nghệ', icon: '💻' },
-  ];
+  // Hàm hỗ trợ map icon dựa trên slug/tên (Vì DB không lưu icon)
+  const getTopicIcon = (slug) => {
+    if (slug?.includes('doi-song') || slug?.includes('daily')) return '☕';
+    if (slug?.includes('giao-duc') || slug?.includes('edu')) return '📚';
+    if (slug?.includes('du-lich') || slug?.includes('travel')) return '🌍';
+    if (slug?.includes('cong-nghe') || slug?.includes('tech')) return '💻';
+    return '🎧'; // Icon mặc định cho Listening
+  };
 
-  // 1. Fetch danh sách đề khi chọn Level/Topic
+  // 1. Fetch danh sách Topics từ Server (QUAN TRỌNG)
   useEffect(() => {
+    fetch('http://localhost:5000/api/admin/topics')
+      .then(res => res.json())
+      .then(data => {
+        setTopics(data);
+        // Tự động chọn topic đầu tiên nếu có dữ liệu
+        if (data.length > 0 && !selectedTopicId) {
+            setSelectedTopicId(data[0].id);
+        }
+      })
+      .catch(err => console.error("Lỗi load topics:", err));
+  }, []);
+
+  // 2. Fetch danh sách đề khi chọn Level/TopicId
+  useEffect(() => {
+    if (!selectedTopicId) return;
+
     const fetchTests = async () => {
       setLoading(true);
       try {
-        // Gọi API lấy danh sách đề
-        const res = await fetch(`http://localhost:5000/api/listening/list?level=${selectedLevel}&topic=${selectedTopic}`);
+        // Gọi API với ID số thực tế
+        const res = await fetch(`http://localhost:5000/api/listening/list?level=${selectedLevel}&topic=${selectedTopicId}`);
         if(res.ok) {
             const data = await res.json();
             setTests(data); 
         } else {
-            setTests([]); // Không có đề
+            setTests([]); 
         }
       } catch (error) {
         console.error("Lỗi tải đề:", error);
@@ -47,9 +65,9 @@ const ListeningDashboard = () => {
       }
     };
     fetchTests();
-  }, [selectedLevel, selectedTopic]);
+  }, [selectedLevel, selectedTopicId]);
 
-  // 2. Fetch lịch sử làm bài
+  // 3. Fetch lịch sử làm bài
   useEffect(() => {
     const fetchHistory = async () => {
         const token = localStorage.getItem('vstep_token');
@@ -66,9 +84,10 @@ const ListeningDashboard = () => {
 
   // Xử lý khi chọn đề để thi
   const handleStartTest = (testId) => {
-    // Chuyển sang trang làm bài (ListeningPractice) kèm theo ID cụ thể
-    // Cần cập nhật ListeningPractice để nhận testId này thay vì random
-    navigate('/practice/listening/start', { state: { level: selectedLevel, topic: selectedTopic, testId: testId } });
+    // Truyền đúng topicId (số) sang trang làm bài
+    navigate('/practice/listening/start', { 
+        state: { level: selectedLevel, topicId: selectedTopicId, testId: testId } 
+    });
   };
 
   return (
@@ -81,7 +100,7 @@ const ListeningDashboard = () => {
           {/* --- CỘT TRÁI: BỘ LỌC & DANH SÁCH ĐỀ (2/3) --- */}
           <div className="lg:col-span-2 space-y-8">
             
-            {/* 1. Header Section */}
+            {/* Header Section */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
                 <div className="relative z-10">
                     <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
@@ -91,15 +110,14 @@ const ListeningDashboard = () => {
                         Chọn trình độ và chủ đề phù hợp để bắt đầu luyện tập. Hệ thống sẽ lưu lại tiến độ của bạn.
                     </p>
                 </div>
-                {/* Decoration */}
                 <div className="absolute right-0 bottom-0 opacity-10">
                     <Headphones size={150} />
                 </div>
             </div>
 
-            {/* 2. Bộ lọc Trình độ & Chủ đề */}
+            {/* Bộ lọc Trình độ & Chủ đề */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="font-bold text-gray-800 mb-4">1. Chọn trình độ mục tiêu</h3>
+                <h3 className="font-bold text-gray-800 mb-4">1. Chọn trình độ</h3>
                 <div className="grid grid-cols-3 gap-4 mb-8">
                     {['B1', 'B2', 'C1'].map(level => (
                         <button 
@@ -116,32 +134,35 @@ const ListeningDashboard = () => {
                     ))}
                 </div>
 
-                <h3 className="font-bold text-gray-800 mb-4">2. Chọn chủ đề luyện tập</h3>
+                <h3 className="font-bold text-gray-800 mb-4">2. Chọn chủ đề</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {topics.map(t => (
+                    {/* Render Topics từ API */}
+                    {topics.length > 0 ? topics.map(t => (
                         <button
                             key={t.id}
-                            onClick={() => setSelectedTopic(t.id)}
+                            onClick={() => setSelectedTopicId(t.id)}
                             className={`p-4 rounded-xl text-left transition-all border ${
-                                selectedTopic === t.id
+                                selectedTopicId === t.id
                                 ? 'border-blue-500 ring-1 ring-blue-500 bg-white shadow-md'
                                 : 'border-gray-200 hover:bg-gray-50'
                             }`}
                         >
-                            <span className="text-xl mr-3">{t.icon}</span>
-                            <span className={`font-medium ${selectedTopic === t.id ? 'text-blue-700' : 'text-gray-700'}`}>
+                            <span className="text-xl mr-3">{getTopicIcon(t.slug)}</span>
+                            <span className={`font-medium ${selectedTopicId === t.id ? 'text-blue-700' : 'text-gray-700'}`}>
                                 {t.name}
                             </span>
                         </button>
-                    ))}
+                    )) : (
+                        <p className="text-gray-400 text-sm col-span-2 text-center">Đang tải chủ đề...</p>
+                    )}
                 </div>
             </div>
 
-            {/* 3. Danh sách Đề thi (List of Tests) */}
+            {/* Danh sách Đề thi */}
             <div>
                 <h3 className="font-bold text-xl text-gray-800 mb-4 flex items-center gap-2">
                     <span className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">3</span>
-                    Danh sách đề thi có sẵn
+                    Danh sách đề thi
                 </h3>
                 
                 {loading ? (
@@ -175,6 +196,7 @@ const ListeningDashboard = () => {
                     </div>
                 ) : (
                     <div className="bg-white p-8 rounded-xl text-center border border-dashed border-gray-300">
+                        <AlertCircle className="w-10 h-10 text-gray-300 mx-auto mb-2"/>
                         <p className="text-gray-500">Chưa có đề thi nào cho chủ đề này.</p>
                     </div>
                 )}
@@ -187,7 +209,7 @@ const ListeningDashboard = () => {
             {/* Thẻ thống kê nhanh */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <BarChart3 size={20} className="text-orange-500"/> Tổng quan kỹ năng
+                    <BarChart3 size={20} className="text-orange-500"/> Tổng quan
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="bg-orange-50 p-4 rounded-xl text-center">
@@ -216,7 +238,7 @@ const ListeningDashboard = () => {
                             {history.map((h, i) => (
                                 <div key={i} className="p-4 hover:bg-gray-50 transition-colors">
                                     <div className="flex justify-between items-center mb-1">
-                                        <span className="font-bold text-sm text-gray-800 truncate max-w-[180px]" title={h.tieu_de_bai_thi}>
+                                        <span className="font-bold text-sm text-gray-800 truncate max-w-[150px]" title={h.tieu_de_bai_thi}>
                                             {h.tieu_de_bai_thi || "Đề luyện tập"}
                                         </span>
                                         <span className={`font-bold ${h.diem_so >= 5 ? 'text-green-600' : 'text-red-500'}`}>
@@ -234,13 +256,7 @@ const ListeningDashboard = () => {
                         <div className="p-8 text-center text-gray-400 text-sm">Chưa có dữ liệu lịch sử.</div>
                     )}
                 </div>
-                {history.length > 0 && (
-                    <button className="w-full py-3 text-sm text-blue-600 font-bold hover:bg-blue-50 transition-colors flex items-center justify-center gap-1">
-                        Xem tất cả <ChevronRight size={14}/>
-                    </button>
-                )}
             </div>
-
           </div>
 
         </div>

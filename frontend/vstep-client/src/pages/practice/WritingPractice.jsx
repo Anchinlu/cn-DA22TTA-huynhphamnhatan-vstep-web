@@ -5,6 +5,8 @@ import {
   PenTool, Play, Home, CheckCircle2, XCircle
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+// [MỚI] Import toast
+import toast from 'react-hot-toast';
 
 const WritingPractice = () => {
   const navigate = useNavigate();
@@ -43,6 +45,7 @@ const WritingPractice = () => {
         setTestData(data);
       } catch (err) {
         setError(err.message);
+        toast.error("Lỗi tải đề thi: " + err.message);
       } finally {
         setLoading(false);
       }
@@ -58,6 +61,7 @@ const WritingPractice = () => {
         if (prev <= 0) {
           clearInterval(timer);
           handleSubmit(true); // Hết giờ -> Force submit
+          toast("Đã hết giờ làm bài!", { icon: '⏰' });
           return 0;
         }
         return prev - 1;
@@ -87,62 +91,111 @@ const WritingPractice = () => {
     return `${m}:${sec < 10 ? '0' : ''}${sec}`;
   };
 
-  const handleStart = () => setIsStarted(true);
+  const handleStart = () => {
+      setIsStarted(true);
+      toast.success("Bắt đầu làm bài!");
+  };
 
   const handleExit = () => {
     if (isSubmitted) { navigate('/practice/writing'); return; }
-    if (window.confirm("Thoát sẽ mất bài làm. Bạn chắc chứ?")) navigate('/practice/writing');
+    
+    // [MỚI] Toast xác nhận thoát
+    toast((t) => (
+      <div className="flex flex-col gap-2">
+        <span className="font-bold text-red-600">Thoát sẽ mất bài làm?</span>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => { toast.dismiss(t.id); navigate('/practice/writing'); }}
+            className="bg-red-600 text-white px-3 py-1 rounded text-sm font-bold"
+          >
+            Thoát luôn
+          </button>
+          <button 
+            onClick={() => toast.dismiss(t.id)}
+            className="bg-gray-200 px-3 py-1 rounded text-sm"
+          >
+            Ở lại
+          </button>
+        </div>
+      </div>
+    ), { duration: 4000 });
   };
 
   // NỘP BÀI & CHẤM ĐIỂM
   const handleSubmit = async (force = false) => {
     if (!force && (!essay.trim() || wordCount < 10)) {
-      alert("Bài viết quá ngắn. Hãy viết thêm trước khi nộp.");
+      toast.error("Bài viết quá ngắn. Hãy viết thêm trước khi nộp.", { icon: '📝' });
       return;
     }
 
-    if(force || window.confirm("Nộp bài để AI chấm điểm ngay?")) {
-      setIsSubmitted(true);
-      setIsGrading(true);
+    const processSubmit = async () => {
+        setIsSubmitted(true);
+        setIsGrading(true);
 
-      try {
-        // 1. Gọi AI Chấm điểm
-        const response = await fetch('http://localhost:5000/api/writing/grade', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: testData?.question_text, essay: essay, level: level })
-        });
-        
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || "Lỗi chấm điểm");
-        
-        setGradingResult(data); // Hiển thị kết quả
-
-        // 2. Lưu kết quả vào DB
-        const token = localStorage.getItem('vstep_token');
-        if (token) {
-          const displayTitle = `Writing - ${testData?.title || 'Bài làm'}`;
-          await fetch('http://localhost:5000/api/results', {
+        try {
+            // 1. Gọi AI Chấm điểm
+            const response = await fetch('http://localhost:5000/api/writing/grade', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({
-              skill: 'writing', 
-              level: level, 
-              score: data.score, 
-              duration: (task === 'task1' ? 20 * 60 : 40 * 60) - timeLeft,
-              testTitle: displayTitle,
-              bai_lam_text: essay, // Lưu nội dung bài viết
-              ai_feedback: data    // Lưu kết quả chấm JSON
-            })
-          });
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic: testData?.question_text, essay: essay, level: level })
+            });
+            
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || "Lỗi chấm điểm");
+            
+            setGradingResult(data); // Hiển thị kết quả
+            toast.success(`Đã chấm điểm: ${data.score}/10`, { duration: 5000 });
+
+            // 2. Lưu kết quả vào DB
+            const token = localStorage.getItem('vstep_token');
+            if (token) {
+                const displayTitle = `Writing - ${testData?.title || 'Bài làm'}`;
+                await fetch('http://localhost:5000/api/results', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({
+                    skill: 'writing', 
+                    level: level, 
+                    score: data.score, 
+                    duration: (task === 'task1' ? 20 * 60 : 40 * 60) - timeLeft,
+                    testTitle: displayTitle,
+                    bai_lam_text: essay, // Lưu nội dung bài viết
+                    ai_feedback: data    // Lưu kết quả chấm JSON
+                    })
+                });
+            }
+        } catch (error) {
+            toast.error("Lỗi: " + error.message);
+            // Nếu lỗi mạng thì cho phép sửa lại để nộp lại
+            if(!force) setIsSubmitted(false);
+        } finally {
+            setIsGrading(false);
         }
-      } catch (error) {
-        alert("Lỗi: " + error.message);
-        // Nếu lỗi mạng thì cho phép sửa lại để nộp lại
-        if(!force) setIsSubmitted(false);
-      } finally {
-        setIsGrading(false);
-      }
+    };
+
+    if(force) {
+        processSubmit();
+    } else {
+        // [MỚI] Toast xác nhận nộp bài
+        toast((t) => (
+          <div className="flex flex-col gap-2">
+            <span className="font-bold">Nộp bài để chấm điểm ngay?</span>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => { toast.dismiss(t.id); processSubmit(); }}
+                className="bg-indigo-600 text-white px-3 py-1 rounded text-sm font-bold"
+              >
+                Chấm điểm
+              </button>
+              <button 
+                onClick={() => toast.dismiss(t.id)}
+                className="bg-gray-200 px-3 py-1 rounded text-sm"
+              >
+                Viết tiếp
+              </button>
+            </div>
+          </div>
+        ), { duration: 5000, icon: '❓' });
     }
   };
 
@@ -153,7 +206,7 @@ const WritingPractice = () => {
   if (!isStarted) {
     return (
       <div className="h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
-        <div className="bg-white max-w-lg w-full p-8 rounded-3xl shadow-xl text-center border border-gray-100">
+        <div className="bg-white max-w-lg w-full p-8 rounded-3xl shadow-xl text-center border border-gray-100 animate-fade-in-up">
           <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6">
             <PenTool className="w-10 h-10" />
           </div>
