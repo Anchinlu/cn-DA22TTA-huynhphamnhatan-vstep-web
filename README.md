@@ -81,25 +81,24 @@ Hệ thống hỗ trợ học viên **tự học hiệu quả**, thông qua:
 docker-compose up --build
 Bước 4: Truy cập:
 http://localhost:3000
-🏗️ Cách 2: Cài đặt thủ công
+```
+### 🏗️ Cách 2: Cài đặt thủ công
 🗄️ Database
 Tạo database: vstep_db
 Import file: FULL_BACKUP_VSTEP.sql
 ⚙️ Backend
-bash
-Sao chép mã
+```bash
 cd backend
 npm install
 npm start
+```
 🎨 Frontend
-bash
-Sao chép mã
+```bash
 cd frontend/vstep-client
 npm install
 npm start
-📂 5. Cấu trúc thư mục (Folder Structure)
-plaintext
-Sao chép mã
+```
+### 📂 5. Cấu trúc thư mục (Folder Structure)
 cn-da22tta-huynhphamnhatan-vstep-web
 ├── backend/              # Xử lý dữ liệu & AI
 ├── frontend/             # Giao diện React
