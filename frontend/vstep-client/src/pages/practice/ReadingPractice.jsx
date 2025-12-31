@@ -235,6 +235,31 @@ const ReadingPractice = () => {
       return "";
   };
 
+  // ====== HÀM GIẢI MÃ JSON TRANSLATION ======
+  const renderTranslation = (translationRaw) => {
+    if (!translationRaw) return "";
+    try {
+      const data = typeof translationRaw === 'string' ? JSON.parse(translationRaw) : translationRaw;
+      if (data && data.question) {
+        return (
+          <div className="space-y-2 text-slate-700 text-sm">
+            <p className="font-bold text-indigo-800">Q: {data.question}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 ml-2">
+              {data.options && Object.entries(data.options).map(([key, value]) => (
+                <p key={key}>
+                  <span className="font-bold">{key}.</span> {value}
+                </p>
+              ))}
+            </div>
+          </div>
+        );
+      }
+    } catch (e) {
+      return <p className="text-slate-700 italic">"{translationRaw}"</p>;
+    }
+    return <p className="text-slate-700 italic">"{translationRaw}"</p>;
+  };
+
   // --- RENDER ---
   if (loading) return (
     <div className="h-screen flex flex-col items-center justify-center bg-slate-50">
@@ -435,8 +460,12 @@ const ReadingPractice = () => {
                         </div>
                         <div className="p-5 space-y-4">
                            <div>
-                              <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase mb-1"><Globe size={12}/> Dịch câu hỏi</div>
-                              <p className="text-slate-700 italic text-sm">"{renderSafeText(aiExplanations[q.id].translation)}"</p>
+                              <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase mb-2">
+                                <Globe size={12}/> Bản dịch chi tiết
+                              </div>
+                              <div className="bg-white/50 p-3 rounded-lg border border-indigo-50 shadow-sm">
+                                {renderTranslation(aiExplanations[q.id].translation)}
+                              </div>
                            </div>
                            <div>
                               <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase mb-1"><Lightbulb size={12}/> Giải thích</div>

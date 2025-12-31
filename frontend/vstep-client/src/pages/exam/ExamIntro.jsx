@@ -24,10 +24,9 @@ const ExamIntro = () => {
       .finally(() => setLoading(false));
   }, [id, navigate]);
 
-  // --- PHẦN ĐÃ SỬA ---
   const handleStart = () => {
     // 1. Hiện thông báo
-    toast.dismiss(); // Xóa các toast cũ nếu có
+    toast.dismiss(); 
     toast.success("Đã vào bài thi!", {
       duration: 3000,
       icon: '🚀',

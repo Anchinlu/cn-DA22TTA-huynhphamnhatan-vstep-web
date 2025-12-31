@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  BookOpen, Search, Menu, X, LogOut,
+  BookOpen, Menu, X, LogOut,
   LayoutDashboard, BookMarked
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
@@ -8,7 +8,6 @@ import { useNavigate, Link } from 'react-router-dom';
 const Header = () => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -112,23 +111,7 @@ const Header = () => {
                </button>
             )}
 
-            {/* Search Icon */}
-            {isSearchOpen ? (
-              <div className="relative flex items-center transition-all duration-300 ease-in-out animate-fade-in">
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm..."
-                  className="w-48 rounded-full border border-gray-300 py-1.5 px-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  onBlur={() => setIsSearchOpen(false)}
-                  autoFocus
-                />
-                <Search className="absolute right-3 h-4 w-4 text-gray-400" />
-              </div>
-            ) : (
-              <button onClick={() => setIsSearchOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-all">
-                <Search className="h-5 w-5" />
-              </button>
-            )}
+            {/* Đã loại bỏ Search Icon ở đây */}
 
             {/* User Dropdown */}
             <div className="relative ml-2">
@@ -178,7 +161,7 @@ const Header = () => {
 
           {/* MOBILE MENU BUTTON */}
           <div className="flex items-center space-x-2 lg:hidden">
-            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-full"><Search className="h-6 w-6" /></button>
+            {/* Đã loại bỏ Search Icon cho mobile ở đây */}
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full">
               {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>

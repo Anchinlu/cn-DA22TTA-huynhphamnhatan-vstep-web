@@ -1545,6 +1545,80 @@ app.get('/api/mock-tests/:id', async (req, res) => {
         res.status(500).json({ message: "Lỗi server: " + err.message });
     }
 });
+//API: Lấy lịch sử thi thử cho Profile 
+app.get("/api/mock-test/history", async (req, res) => {
+    try {
+        const token = req.headers['authorization']?.split(' ')[1];
+        if (!token) return res.status(401).json({ message: "Unauthorized" });
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const [rows] = await pool.query(
+            "SELECT * FROM ket_qua_thi_thu WHERE user_id = ? ORDER BY ngay_thi DESC", 
+            [decoded.userId]
+        );
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ message: "Lỗi tải lịch sử Mock Test" });
+    }
+});
+
+// API: Nộp bài và lưu kết quả thi thử
+app.post("/api/mock-test/submit", async (req, res) => {
+  try {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const { 
+      listening_score, reading_score, writing_score, speaking_score, 
+      overall_score, chi_tiet_bai_lam 
+    } = req.body;
+
+    // Lưu vào bảng ket_qua_thi_thu
+    const sql = `
+      INSERT INTO ket_qua_thi_thu 
+      (user_id, listening_score, reading_score, writing_score, speaking_score, overall_score, chi_tiet_bai_lam, ngay_thi) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+    `;
+
+    await pool.query(sql, [
+      decoded.userId, listening_score, reading_score, writing_score, speaking_score, 
+      overall_score, JSON.stringify(chi_tiet_bai_lam)
+    ]);
+
+    res.status(201).json({ message: "Đã lưu kết quả thi thử!" });
+  } catch (err) {
+    res.status(500).json({ message: "Lỗi lưu kết quả thi." });
+  }
+});
+app.post("/api/ai/grade-writing", async (req, res) => {
+  try {
+    const { question, studentAnswer } = req.body;
+    const prompt = `
+      Bạn là giám khảo VSTEP. Hãy chấm điểm bài viết sau:
+      Đề bài: "${question}"
+      Bài làm: "${studentAnswer}"
+      Yêu cầu: Chấm trên thang điểm 10. Trả về duy nhất định dạng JSON:
+      {"score": số_điểm, "feedback": "nhận xét ngắn gọn"}
+    `;
+    const result = await callGemini(prompt); 
+    res.json(result);
+  } catch (err) { res.status(500).json({ score: 0, feedback: "Lỗi chấm điểm" }); }
+});
+
+app.post("/api/ai/grade-speaking", async (req, res) => {
+  try {
+    const { question, studentResponse } = req.body;
+    const prompt = `
+      Bạn là giám khảo VSTEP. Chấm điểm kỹ năng nói (giả lập).
+      Câu hỏi: "${question}"
+      Trạng thái bài làm: "${studentResponse}"
+      Yêu cầu: Nếu đã ghi âm, cho điểm từ 5-9 dựa trên độ khó. Nếu chưa, cho 0.
+      Trả về duy nhất định dạng JSON: {"score": số_điểm}
+    `;
+    const result = await callGemini(prompt);
+    res.json(result);
+  } catch (err) { res.status(500).json({ score: 0 }); }
+});
 
 // KHỞI ĐỘNG SERVER
 const PORT = process.env.PORT || 5000;

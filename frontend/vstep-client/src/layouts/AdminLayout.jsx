@@ -14,7 +14,6 @@ const AdminLayout = () => {
   const teacherMenu = [
     { name: 'Bảng điều khiển', path: '/admin', icon: LayoutDashboard },
     { name: 'Lớp học của tôi', path: '/admin/classes', icon: School },
-    { name: 'Hỗ trợ học viên', path: '/admin/support', icon: Users },
   ];
 
   // MENU CHO ADMIN
@@ -22,7 +21,6 @@ const AdminLayout = () => {
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { name: 'Quản lý Người dùng', path: '/admin/users', icon: Users },
     { name: 'Quản lý Lớp học', path: '/admin/classes', icon: School },
-    // [MỚI] Thêm mục Kho đề thi
     { name: 'Kho đề thi', path: '/admin/create-practice', icon: FileText },
     { name: 'Đề Thi Thử full tacks', path: '/admin/mock-test', icon: Zap },
   ];

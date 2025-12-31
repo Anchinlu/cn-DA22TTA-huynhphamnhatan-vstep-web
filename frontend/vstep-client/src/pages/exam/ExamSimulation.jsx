@@ -40,9 +40,8 @@ const ExamSimulation = () => {
   const utteranceRef = useRef(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  // [NEW] VOICE SELECTION STATE
   const [availableVoices, setAvailableVoices] = useState([]);
-  const [voiceGender, setVoiceGender] = useState('female'); // Giọng mặc định cho Intro
+  const [voiceGender] = useState('female'); // Cố định giọng Nữ như bài thi thật
 
   // --- ANSWERS STATE ---
   const [answers, setAnswers] = useState({ listening: {}, reading: {}, writing: {}, speaking: {} });
@@ -78,7 +77,7 @@ const ExamSimulation = () => {
 
     return () => {
       isCancelledRef.current = true;
-      window.speechSynthesis.cancel();
+      window.speechSynthesis.cancel(); // Ngắt giọng khi unmount component
     };
   }, [id, navigate]);
 
@@ -126,8 +125,7 @@ const ExamSimulation = () => {
         u.pitch = 0.9;
         u.rate = 0.9;
     } else {
-        // Giọng người dẫn chuyện (Narrator) dùng giọng giới tính người dùng đã chọn ở Intro
-        u.voice = voiceGender === 'male' ? maleVoice : femaleVoice;
+        u.voice = femaleVoice; // Narrator cũng dùng giọng nữ theo yêu cầu cải tiến
         u.rate = 0.95;
     }
 
@@ -143,30 +141,34 @@ const ExamSimulation = () => {
     synthRef.current.speak(u);
   };
 
-  // 2. LISTENING INTRO AI 
+  // 2. LISTENING INTRO AI - ĐÃ CẢI TIẾN: TỰ ĐỘNG NGẮT KHI CHUYỂN SKILL
   useEffect(() => {
-      if (currentSkill === 'listening' && listeningStatus === 'intro') {
+      // Nếu không còn ở Listening, tắt giọng AI ngay lập tức
+      if (currentSkill !== 'listening') {
+          window.speechSynthesis.cancel();
+          return;
+      }
+
+      if (listeningStatus === 'intro') {
           setIsTimerRunning(false);
           isPlayingRef.current = true;
           isCancelledRef.current = false;
 
           const introText = "This is the listening test. You will have 30 seconds to preview the questions before the audio starts. Please listen carefully.";
-          const introScript = [{ role: 'narrator', text: introText }];
           
-          // Sử dụng một biến tạm để kết thúc Intro và sang Prep
           const startPrep = () => {
-            setListeningStatus('prep');
-            setIsTimerRunning(true);
-            toast("Bắt đầu 30s đọc trước câu hỏi!", { icon: '👀' });
+            if (currentSkill === 'listening') { // Kiểm tra lần nữa trước khi chuyển trạng thái
+                setListeningStatus('prep');
+                setIsTimerRunning(true);
+                toast("Bắt đầu 30s đọc trước câu hỏi!", { icon: '👀' });
+            }
           };
 
-          // Ghi đè logic playDialogue một chút cho phần Intro
           const u = new SpeechSynthesisUtterance(introText);
           const voices = window.speechSynthesis.getVoices();
           const femaleVoice = voices.find(v => v.lang.includes('en') && (v.name.includes('Female') || v.name.includes('Zira'))) || voices[0];
-          const maleVoice = voices.find(v => v.lang.includes('en') && (v.name.includes('Male') || v.name.includes('David'))) || voices[0];
           
-          u.voice = voiceGender === 'male' ? maleVoice : femaleVoice;
+          u.voice = femaleVoice;
           u.lang = 'en-US';
           u.onend = startPrep;
           
@@ -187,11 +189,12 @@ const ExamSimulation = () => {
   }, [listeningStatus, prepTime]);
 
   const startAudioPlayback = () => {
+    if (currentSkill !== 'listening') return; // Ngăn phát audio nếu đã bấm sang Reading
+
     setListeningStatus('playing');
     if (examData.listening?.audio_url && audioRef.current) {
         audioRef.current.play().catch(() => toast.error("Vui lòng bấm nút Play"));
     } else if (examData.listening?.script_content) {
-        // Áp dụng logic phát hội thoại đa vai
         const scriptArray = parseScript(examData.listening.script_content);
         isPlayingRef.current = true;
         isCancelledRef.current = false;
@@ -204,7 +207,6 @@ const ExamSimulation = () => {
 
   const formatTime = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
 
-  // --- CÁC PHẦN CORE ACTIONS & HANDLERS GIỮ NGUYÊN ---
   const checkCompletion = (skill) => {
       if (!examData) return { isComplete: true };
       let total = 0, answered = 0;
@@ -225,15 +227,101 @@ const ExamSimulation = () => {
       return { isComplete: true };
   };
 
-  const executeSubmit = () => {
+  const executeSubmit = async () => {
       setIsTimerRunning(false);
-      window.speechSynthesis.cancel();
-      toast.success("Nộp bài thành công!");
-      navigate('/practice');
+      window.speechSynthesis.cancel(); // Tắt AI khi nộp bài
+      
+      const token = localStorage.getItem('vstep_token');
+      if (!token) {
+          toast.error("Vui lòng đăng nhập để lưu kết quả!");
+          navigate('/dang-nhap');
+          return;
+      }
+
+      const toastId = toast.loading("Giám khảo AI đang chấm bài, vui lòng đợi...");
+
+      try {
+          let lCorrect = 0;
+          const lQs = examData.listening?.questions || [];
+          lQs.forEach(q => { 
+              const userAns = (answers.listening[q.id] || "").toLowerCase();
+              const correctAns = (q.correct_answer || q.correct || "").toLowerCase();
+              if (userAns === correctAns && userAns !== "") lCorrect++; 
+          });
+          const listening_score = lQs.length > 0 ? (lCorrect / lQs.length) * 10 : 0;
+
+          let rCorrect = 0, rTotal = 0;
+          examData.reading?.forEach(p => p.questions?.forEach(q => {
+              rTotal++;
+              const userAns = (answers.reading[q.id] || "").toLowerCase();
+              const correctAns = (q.correct_answer || q.correct || "").toLowerCase();
+              if (userAns === correctAns && userAns !== "") rCorrect++;
+          }));
+          const reading_score = rTotal > 0 ? (rCorrect / rTotal) * 10 : 0;
+
+          let writing_score = 0;
+          if (examData.writing && examData.writing.length > 0) {
+              let totalW = 0;
+              for (const task of examData.writing) {
+                  const res = await fetch('http://localhost:5000/api/ai/grade-writing', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                          question: task.question_text, 
+                          studentAnswer: answers.writing[task.id] || "Không có bài làm" 
+                      })
+                  });
+                  const grade = await res.json();
+                  totalW += parseFloat(grade.score || 0);
+              }
+              writing_score = totalW / examData.writing.length;
+          }
+
+          let speaking_score = 0;
+          if (examData.speaking && examData.speaking.length > 0) {
+              let totalS = 0;
+              for (const part of examData.speaking) {
+                  const res = await fetch('http://localhost:5000/api/ai/grade-speaking', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                          question: part.question_text, 
+                          studentResponse: answers.speaking[part.id] || "Chưa ghi âm" 
+                      })
+                  });
+                  const grade = await res.json();
+                  totalS += parseFloat(grade.score || 0);
+              }
+              speaking_score = totalS / examData.speaking.length;
+          }
+
+          const overall_score = Math.round(((listening_score + reading_score + writing_score + speaking_score) / 4) * 10) / 10;
+
+          const resSubmit = await fetch('http://localhost:5000/api/mock-test/submit', {
+              method: 'POST',
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}` 
+              },
+              body: JSON.stringify({
+                  listening_score, reading_score, writing_score, speaking_score, overall_score,
+                  chi_tiet_bai_lam: answers 
+              })
+          });
+
+          if (!resSubmit.ok) throw new Error("Lỗi hệ thống khi lưu điểm");
+          
+          toast.success("Nộp bài thành công!", { id: toastId });
+          navigate('/profile'); 
+
+      } catch (err) {
+          console.error("Lỗi nộp bài:", err);
+          toast.error("Lỗi: " + err.message, { id: toastId });
+      }
   };
 
   const executeNextSkill = () => {
-      window.speechSynthesis.cancel();
+      window.speechSynthesis.cancel(); // QUAN TRỌNG: Tắt giọng AI ngay khi bấm nút
       if (currentSkillIndex < 3) {
           setCurrentSkillIndex(prev => prev + 1);
           window.scrollTo(0, 0);
@@ -244,7 +332,7 @@ const ExamSimulation = () => {
   };
 
   const executeExit = () => {
-      window.speechSynthesis.cancel();
+      window.speechSynthesis.cancel(); // Tắt AI khi thoát
       navigate('/practice');
   };
 
@@ -289,6 +377,7 @@ const ExamSimulation = () => {
          setIsTimerRunning(false);
      } else {
          setIsTimerRunning(true);
+         window.speechSynthesis.cancel(); // Phụ trợ thêm: Tắt AI khi đổi Index kỹ năng
      }
   }, [currentSkillIndex]);
 
@@ -314,7 +403,7 @@ const ExamSimulation = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans flex flex-col relative">
-      {/* MODAL GIỮ NGUYÊN */}
+      {/* MODAL */}
       {showConfirmModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
               <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-gray-100">
@@ -335,7 +424,7 @@ const ExamSimulation = () => {
           </div>
       )}
 
-      {/* HEADER GIỮ NGUYÊN */}
+      {/* HEADER */}
       <header className="h-16 bg-white border-b shadow-sm fixed top-0 w-full z-50 flex items-center justify-between px-6">
         <div className="font-bold text-lg text-indigo-700 truncate max-w-xs">{examData.title}</div>
         <div className="hidden md:flex items-center gap-2">
@@ -367,16 +456,7 @@ const ExamSimulation = () => {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        {listeningStatus === 'intro' && (
-                             <div className="flex bg-gray-100 rounded-lg p-1 border">
-                                <button onClick={() => setVoiceGender('male')} className={`px-3 py-1 rounded-md text-sm font-bold flex items-center gap-1 transition ${voiceGender === 'male' ? 'bg-white shadow text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}>
-                                    <User size={14}/> Nam
-                                </button>
-                                <button onClick={() => setVoiceGender('female')} className={`px-3 py-1 rounded-md text-sm font-bold flex items-center gap-1 transition ${voiceGender === 'female' ? 'bg-white shadow text-pink-500' : 'text-gray-400 hover:text-gray-600'}`}>
-                                    <User size={14}/> Nữ
-                                </button>
-                             </div>
-                        )}
+                        {/* Đã loại bỏ nút chọn giới tính theo yêu cầu: Auto Nữ */}
                         {listeningStatus === 'prep' && (
                             <div className="flex items-center gap-2 text-orange-600 font-bold text-2xl animate-pulse bg-orange-50 px-3 py-1 rounded-lg border border-orange-200">
                                 <Clock size={24}/> {prepTime}s
@@ -408,7 +488,7 @@ const ExamSimulation = () => {
             </div>
         )}
 
-        {/* CÁC PHẦN READING, WRITING, SPEAKING GIỮ NGUYÊN HOÀN TOÀN NHƯ CODE BẠN GỬI */}
+        {/* READING SECTION (Giữ nguyên) */}
         {currentSkill === 'reading' && (
              <div className="animate-fade-in space-y-12">
              {examData.reading?.map((passage, idx) => (
@@ -437,6 +517,7 @@ const ExamSimulation = () => {
          </div>
         )}
 
+        {/* WRITING SECTION (Giữ nguyên) */}
         {currentSkill === 'writing' && (
              <div className="animate-fade-in space-y-8">
              {examData.writing && examData.writing.length > 0 ? (
@@ -458,6 +539,7 @@ const ExamSimulation = () => {
          </div>
         )}
         
+        {/* SPEAKING SECTION (Giữ nguyên) */}
         {currentSkill === 'speaking' && (
              <div className="animate-fade-in space-y-8">
              {examData.speaking && examData.speaking.length > 0 ? (
