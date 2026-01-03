@@ -138,18 +138,18 @@ const TrangChu = () => {
   const skills = [
     { id: 'listening', title: 'Listening', desc: 'Luyện nghe đa giọng đọc chuẩn VSTEP', icon: Headphones, color: 'text-blue-500', bg: 'bg-blue-50', link: '/practice/listening' },
     { id: 'reading', title: 'Reading', desc: 'Kho bài đọc phong phú mọi chủ đề', icon: BookOpen, color: 'text-emerald-500', bg: 'bg-emerald-50', link: '/practice/reading' },
-    { id: 'writing', title: 'Writing', desc: 'AI chấm điểm & sửa lỗi ngữ pháp', icon: PenTool, color: 'text-indigo-500', bg: 'bg-indigo-50', link: '/practice/writing' },
+    { id: 'writing', title: 'Writing', desc: 'Trợ lí Chinhlu chấm điểm & sửa lỗi ngữ pháp', icon: PenTool, color: 'text-indigo-500', bg: 'bg-indigo-50', link: '/practice/writing' },
     { id: 'speaking', title: 'Speaking', desc: 'Phòng thu âm ảo chấm phát âm', icon: Mic, color: 'text-orange-500', bg: 'bg-orange-50', link: '/practice/speaking' }
   ];
 
   const steps = [
     { num: '01', title: 'Chọn kỹ năng', desc: 'Lựa chọn 1 trong 4 kỹ năng bạn muốn ôn luyện.' },
     { num: '02', title: 'Làm bài thi', desc: 'Thực hành với kho đề thi sát thực tế, có bấm giờ.' },
-    { num: '03', title: 'Nhận kết quả AI', desc: 'Xem điểm số và nhận xét chi tiết ngay lập tức.' }
+    { num: '03', title: 'Nhận kết quả từ Trợ lí Chinhlu', desc: 'Xem điểm số và nhận xét chi tiết ngay lập tức.' }
   ];
 
   const testimonials = [
-    { name: "Minh Anh", role: "Sinh viên ĐH QGHN", content: "Nhờ tính năng chấm Writing của AI mà mình đã nâng band điểm từ B1 lên B2 chỉ sau 2 tuần.", avatar: "M" },
+    { name: "Minh Anh", role: "Sinh viên ĐH QGHN", content: "Nhờ tính năng chấm Writing của Trợ lí Chinhlu mà mình đã nâng band điểm từ B1 lên B2 chỉ sau 2 tuần.", avatar: "M" },
     { name: "Tuấn Hưng", role: "Người đi làm", content: "Giao diện rất dễ dùng, tranh thủ giờ nghỉ trưa vào luyện Speaking cực tiện.", avatar: "T" },
     { name: "Lan Chi", role: "Học sinh THPT", content: "Kho đề Reading rất sát với đề thi thật. Cảm ơn đội ngũ phát triển!", avatar: "L" }
   ];
@@ -173,7 +173,7 @@ const TrangChu = () => {
               <Reveal direction="left">
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-blue-300 text-sm font-semibold shadow-lg">
                   <Sparkles size={16} className="text-yellow-400 animate-spin-slow" /> 
-                  <span>Công nghệ AI chấm thi VSTEP 2025</span>
+                  <span>Công nghệ Trợ lí Chinhlu chấm thi VSTEP 2025</span>
                 </div>
               </Reveal>
               
@@ -206,7 +206,7 @@ const TrangChu = () => {
               <Reveal delay={800}>
                 <div className="pt-8 flex items-center justify-center lg:justify-start gap-6 text-sm text-slate-400 font-medium">
                    <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-green-400"/> Miễn phí trọn đời</div>
-                   <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-green-400"/> AI Chấm điểm</div>
+                   <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-green-400"/> Trợ lí Chinhlu chấm điểm</div>
                    <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-green-400"/> Đề thi mới nhất</div>
                 </div>
               </Reveal>
@@ -289,12 +289,12 @@ const TrangChu = () => {
                         <Reveal direction="left">
                             <div className="relative">
                                 <div className="absolute inset-0 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-3xl blur-2xl opacity-20"></div>
-                                <img src="/img/writing.jpg" alt="AI Grading" className="relative rounded-3xl shadow-2xl w-full h-[400px] object-cover transform transition-transform hover:scale-[1.02] duration-500" />
+                                <img src="/img/writing.jpg" alt="Trợ lí Chinhlu Grading" className="relative rounded-3xl shadow-2xl w-full h-[400px] object-cover transform transition-transform hover:scale-[1.02] duration-500" />
                                 
                                 <div className="absolute bottom-8 right-8 bg-white p-6 rounded-2xl shadow-xl max-w-xs animate-bounce-slow hidden sm:block">
                                     <div className="flex items-center gap-3 mb-3">
                                         <Sparkles className="text-yellow-500" />
-                                        <span className="font-bold text-slate-800">AI Analysis</span>
+                                        <span className="font-bold text-slate-800">Phân tích bởi Trợ lí Chinhlu</span>
                                     </div>
                                     <div className="space-y-3">
                                         <div className="flex items-center gap-2 text-sm"><span className="font-bold text-green-600">Score:</span> 7.5/10</div>
@@ -310,10 +310,10 @@ const TrangChu = () => {
                                 ✨ Công nghệ độc quyền
                             </div>
                             <h2 className="text-4xl font-black text-slate-900 leading-tight mt-4">
-                                Chấm điểm Writing & Speaking bằng <span className="text-blue-600">AI</span>
+                                Chấm điểm Writing & Speaking bằng <span className="text-blue-600">Trợ lí Chinhlu</span>
                             </h2>
                             <p className="text-lg text-slate-600 leading-relaxed">
-                                Không còn phải chờ đợi giáo viên. Hệ thống AI của chúng tôi sẽ phân tích bài làm của bạn trong tích tắc, chỉ ra lỗi sai ngữ pháp, từ vựng và gợi ý cách sửa để nâng band điểm nhanh chóng.
+                                Không còn phải chờ đợi giáo viên. Trợ lí Chinhlu sẽ phân tích bài làm của bạn trong tích tắc, chỉ ra lỗi sai ngữ pháp, từ vựng và gợi ý cách sửa để nâng band điểm nhanh chóng.
                             </p>
                             <ul className="space-y-4">
                                 {["Chấm điểm theo thang chuẩn VSTEP", "Phát hiện lỗi sai chính tả, ngữ pháp", "Gợi ý từ vựng nâng cao (C1/C2)", "Nhận xét chi tiết từng tiêu chí"].map((item, i) => (

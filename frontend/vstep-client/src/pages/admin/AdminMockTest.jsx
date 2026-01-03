@@ -15,9 +15,13 @@ const AdminMockTest = () => {
     
     setIsGenerating(true);
     try {
-        const res = await fetch('http://localhost:5000/api/admin/auto-generate-test', {
+        const token = localStorage.getItem('vstep_token');
+        const res = await fetch('http://localhost:5000/api/mock-tests/auto-generate', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify({ title, description: desc })
         });
         const data = await res.json();

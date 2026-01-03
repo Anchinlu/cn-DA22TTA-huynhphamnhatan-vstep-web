@@ -28,7 +28,7 @@ const Profile = () => {
         });
         
         // 2. [MỚI] Fetch lịch sử thi thử từ bảng ket_qua_thi_thu
-        const mockRes = await fetch('http://localhost:5000/api/mock-test/history', {
+        const mockRes = await fetch('http://localhost:5000/api/mock-tests/history', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 

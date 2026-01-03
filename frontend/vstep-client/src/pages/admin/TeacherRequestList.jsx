@@ -6,7 +6,7 @@ const TeacherRequestList = () => {
 
   const fetchRequests = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/admin/teacher-requests');
+      const res = await fetch('http://localhost:5000/api/dashboard/admin/teacher-requests');
       if(res.ok) setRequests(await res.json());
     } catch (err) { console.error(err); }
   };
@@ -16,7 +16,7 @@ const TeacherRequestList = () => {
   const handleProcess = async (id, action) => {
     if(!window.confirm(`Bạn chắc chắn muốn ${action === 'approve' ? 'DUYỆT' : 'TỪ CHỐI'} yêu cầu này?`)) return;
     try {
-        await fetch(`http://localhost:5000/api/admin/teacher-requests/${id}`, {
+        await fetch(`http://localhost:5000/api/dashboard/admin/teacher-requests/${id}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action })

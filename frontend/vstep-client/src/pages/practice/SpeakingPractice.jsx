@@ -363,7 +363,7 @@ const SpeakingPractice = () => {
                         {!aiFeedback ? (
                             <button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full py-3.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-orange-500/20 active:scale-95 disabled:opacity-70">
                                 {isAnalyzing ? <Loader2 className="animate-spin w-5 h-5"/> : <Sparkles className="w-5 h-5"/>}
-                                {isAnalyzing ? "AI đang chấm điểm..." : "Chấm điểm ngay"}
+                                {isAnalyzing ? "Trợ lí Chinhlu đang chấm điểm..." : "Chấm điểm ngay"}
                             </button>
                         ) : (
                             <div className={`p-5 rounded-2xl border animate-fade-in ${isDarkMode ? 'bg-indigo-900/20 border-indigo-500/30' : 'bg-indigo-50 border-indigo-100'}`}>

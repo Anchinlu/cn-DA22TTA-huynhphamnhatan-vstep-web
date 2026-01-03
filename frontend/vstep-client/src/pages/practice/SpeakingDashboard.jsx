@@ -136,7 +136,7 @@ const SpeakingDashboard = () => {
                             <Mic className="w-8 h-8"/> Luyện Nói VSTEP
                         </h1>
                         <p className="text-orange-100 opacity-90 max-w-lg">
-                            Luyện tập phản xạ, ghi âm và nhận đánh giá phát âm từ AI.
+                            Luyện tập phản xạ, ghi âm và nhận đánh giá phát âm từ Trợ lí Chinhlu.
                         </p>
                     </div>
                     <div className="absolute right-0 bottom-0 opacity-10"><Mic size={150} /></div>

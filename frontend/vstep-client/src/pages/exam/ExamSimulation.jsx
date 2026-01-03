@@ -238,7 +238,7 @@ const ExamSimulation = () => {
           return;
       }
 
-      const toastId = toast.loading("Giám khảo AI đang chấm bài, vui lòng đợi...");
+    const toastId = toast.loading("Trợ lí Chinhlu đang chấm bài, vui lòng đợi...");
 
       try {
           let lCorrect = 0;
@@ -263,14 +263,27 @@ const ExamSimulation = () => {
           if (examData.writing && examData.writing.length > 0) {
               let totalW = 0;
               for (const task of examData.writing) {
+                  const text = (answers.writing[task.id] || "").toString().trim();
+                  if (!text || text.length < 10) {
+                      // Nếu bỏ trống hoặc quá ngắn, bỏ qua gọi Trợ lí Chinhlu và cho 0 điểm
+                      toast("Bài viết trống hoặc quá ngắn — chấm 0 điểm (Trợ lí Chinhlu bỏ qua)");
+                      totalW += 0;
+                      continue;
+                  }
+
                   const res = await fetch('http://localhost:5000/api/ai/grade-writing', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ 
                           question: task.question_text, 
-                          studentAnswer: answers.writing[task.id] || "Không có bài làm" 
+                          studentAnswer: text
                       })
                   });
+                  if (!res.ok) {
+                      console.error('Lỗi Trợ lí Chinhlu grade-writing:', res.status);
+                      totalW += 0;
+                      continue;
+                  }
                   const grade = await res.json();
                   totalW += parseFloat(grade.score || 0);
               }
@@ -281,14 +294,27 @@ const ExamSimulation = () => {
           if (examData.speaking && examData.speaking.length > 0) {
               let totalS = 0;
               for (const part of examData.speaking) {
+                  const resp = answers.speaking[part.id];
+                  // Nếu chưa ghi âm (null/undefined) thì cho 0
+                  if (!resp || resp === 'Chưa ghi âm') {
+                      toast("Phần nói chưa có ghi âm — chấm 0 điểm (Trợ lí Chinhlu bỏ qua)");
+                      totalS += 0;
+                      continue;
+                  }
+
                   const res = await fetch('http://localhost:5000/api/ai/grade-speaking', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ 
                           question: part.question_text, 
-                          studentResponse: answers.speaking[part.id] || "Chưa ghi âm" 
+                          studentResponse: resp
                       })
                   });
+                  if (!res.ok) {
+                      console.error('Lỗi Trợ lí Chinhlu grade-speaking:', res.status);
+                      totalS += 0;
+                      continue;
+                  }
                   const grade = await res.json();
                   totalS += parseFloat(grade.score || 0);
               }
@@ -297,7 +323,7 @@ const ExamSimulation = () => {
 
           const overall_score = Math.round(((listening_score + reading_score + writing_score + speaking_score) / 4) * 10) / 10;
 
-          const resSubmit = await fetch('http://localhost:5000/api/mock-test/submit', {
+          const resSubmit = await fetch('http://localhost:5000/api/mock-tests/submit', {
               method: 'POST',
               headers: { 
                   'Content-Type': 'application/json',
@@ -321,7 +347,7 @@ const ExamSimulation = () => {
   };
 
   const executeNextSkill = () => {
-      window.speechSynthesis.cancel(); // QUAN TRỌNG: Tắt giọng AI ngay khi bấm nút
+    window.speechSynthesis.cancel(); // QUAN TRỌNG: Tắt giọng Trợ lí Chinhlu ngay khi bấm nút
       if (currentSkillIndex < 3) {
           setCurrentSkillIndex(prev => prev + 1);
           window.scrollTo(0, 0);
@@ -332,7 +358,7 @@ const ExamSimulation = () => {
   };
 
   const executeExit = () => {
-      window.speechSynthesis.cancel(); // Tắt AI khi thoát
+    window.speechSynthesis.cancel(); // Tắt Trợ lí Chinhlu khi thoát
       navigate('/practice');
   };
 
@@ -377,7 +403,7 @@ const ExamSimulation = () => {
          setIsTimerRunning(false);
      } else {
          setIsTimerRunning(true);
-         window.speechSynthesis.cancel(); // Phụ trợ thêm: Tắt AI khi đổi Index kỹ năng
+        window.speechSynthesis.cancel(); // Phụ trợ thêm: Tắt Trợ lí Chinhlu khi đổi Index kỹ năng
      }
   }, [currentSkillIndex]);
 
@@ -448,7 +474,7 @@ const ExamSimulation = () => {
                            <Headphones size={20} className="text-indigo-600"/> {examData.listening.title}
                         </h3>
                         <p className="text-sm text-gray-500 mt-1 italic">
-                            {listeningStatus === 'intro' && "AI đang đọc hướng dẫn (Đồng hồ đang dừng)..."}
+                            {listeningStatus === 'intro' && "Trợ lí Chinhlu đang đọc hướng dẫn (Đồng hồ đang dừng)..."}
                             {listeningStatus === 'prep' && "Thời gian đọc trước câu hỏi..."}
                             {listeningStatus === 'playing' && "Đang phát hội thoại..."}
                             {listeningStatus === 'finished' && "Đã kết thúc bài nghe."}

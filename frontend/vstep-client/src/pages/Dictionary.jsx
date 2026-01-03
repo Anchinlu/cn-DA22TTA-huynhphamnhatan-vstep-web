@@ -77,7 +77,7 @@ const Dictionary = () => {
                 <div className="p-2 bg-blue-50 rounded-xl text-blue-600">
                   <Book className="w-6 h-6" /> 
                 </div>
-                Dictionary AI
+                Từ điển Trợ lí Chinhlu
               </h1>
               <p className="text-slate-500 text-sm mt-2 ml-1">Tra cứu từ vựng VSTEP chuẩn xác</p>
             </div>

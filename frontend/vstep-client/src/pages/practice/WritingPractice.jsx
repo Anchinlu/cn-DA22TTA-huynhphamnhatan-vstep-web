@@ -133,7 +133,7 @@ const WritingPractice = () => {
         setIsGrading(true);
 
         try {
-            // 1. Gọi AI Chấm điểm
+            // 1. Gọi Trợ lí Chinhlu Chấm điểm
             const response = await fetch('http://localhost:5000/api/writing/grade', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -219,7 +219,7 @@ const WritingPractice = () => {
           <div className="bg-indigo-50 p-6 rounded-2xl text-left mb-8 space-y-3 text-indigo-900 text-sm">
             <div className="flex items-center gap-3"><Clock className="w-5 h-5" /> Thời gian: {task === 'task1' ? '20' : '40'} phút</div>
             <div className="flex items-center gap-3"><AlignLeft className="w-5 h-5" /> Yêu cầu: {task === 'task1' ? '120' : '250'}+ từ</div>
-            <div className="flex items-center gap-3"><Sparkles className="w-5 h-5" /> AI Chấm điểm & Sửa lỗi</div>
+            <div className="flex items-center gap-3"><Sparkles className="w-5 h-5" /> Trợ lí Chinhlu chấm điểm & Sửa lỗi</div>
           </div>
 
           <div className="flex gap-4">
@@ -291,7 +291,7 @@ const WritingPractice = () => {
           {isGrading && (
             <div className="absolute inset-0 z-50 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center text-indigo-600">
               <Loader2 className="w-12 h-12 animate-spin mb-4" />
-              <h3 className="text-xl font-bold">AI đang chấm bài...</h3>
+              <h3 className="text-xl font-bold">Trợ lí Chinhlu đang chấm bài...</h3>
               <p className="text-gray-500 mt-2">Vui lòng đợi trong giây lát</p>
             </div>
           )}

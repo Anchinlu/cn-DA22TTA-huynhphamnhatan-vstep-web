@@ -97,7 +97,7 @@ const AdminPractice = () => {
     if (skill === 'writing' && !content) return toast.error("Chưa nhập đề bài chi tiết!");
     if (skill === 'speaking' && !content) return toast.error("Chưa nhập câu hỏi nói!"); // Dùng biến content làm câu hỏi Speaking
     
-    if (skill === 'listening' && !scriptContent) return toast.error("Chưa nhập kịch bản (Script) cho AI đọc!");
+    if (skill === 'listening' && !scriptContent) return toast.error("Chưa nhập kịch bản (Script) cho Trợ lí Chinhlu đọc!");
     
     if ((skill === 'reading' || skill === 'listening') && questions.length === 0) return toast.error("Chưa có câu hỏi trắc nghiệm!");
 
@@ -281,11 +281,11 @@ const AdminPractice = () => {
 
             {/* KHU VỰC NỘI DUNG CHÍNH */}
             
-            {/* 1. LISTENING: Script AI */}
+            {/* 1. LISTENING: Script Trợ lí Chinhlu */}
             {skill === 'listening' && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-indigo-500">
                 <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2"><FileText size={18}/> Kịch bản nghe (Script)</h3>
-                <p className="text-xs text-gray-500 mb-4">Nhập hội thoại (Man: ..., Woman: ...) để AI đọc.</p>
+                <p className="text-xs text-gray-500 mb-4">Nhập hội thoại (Man: ..., Woman: ...) để Trợ lí Chinhlu đọc.</p>
                 <textarea 
                   rows="8"
                   className="w-full p-4 bg-indigo-50/30 border border-indigo-100 rounded-xl outline-none font-medium text-gray-700 focus:ring-2 focus:ring-indigo-200 transition"

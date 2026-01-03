@@ -348,7 +348,7 @@ const ListeningPractice = () => {
       });
       const json = await res.json();
       setAiExplanations(prev => ({ ...prev, [qId]: json }));
-    } catch (err) { toast.error("Lỗi AI"); } 
+    } catch (err) { toast.error("Lỗi Trợ lí Chinhlu"); } 
     finally { setExplainingId(null); }
   };
 
@@ -545,16 +545,16 @@ const ListeningPractice = () => {
                       <div className="mt-6 ml-11 pt-4 border-t border-dashed border-gray-200">
                         {aiExplanations[q.id] ? (
                           <div className="bg-indigo-50 rounded-xl p-5 border border-indigo-100 animate-fade-in">
-                            <div className="flex items-center gap-2 mb-3 text-indigo-700 font-bold text-sm uppercase"><Sparkles className="w-4 h-4" /> AI Giải thích</div>
+                            <div className="flex items-center gap-2 mb-3 text-indigo-700 font-bold text-sm uppercase"><Sparkles className="w-4 h-4" /> Trợ lí Chinhlu giải thích</div>
                             <div className="space-y-3">
-                                <div><span className="text-xs font-bold text-gray-500 uppercase flex gap-1 mb-1"><Globe size={12}/> Dịch</span><p className="text-gray-800 italic text-sm">{typeof aiExplanations[q.id].translation === 'string' ? aiExplanations[q.id].translation : "..."}</p></div>
-                                <div><span className="text-xs font-bold text-gray-500 uppercase flex gap-1 mb-1"><Lightbulb size={12}/> Giải thích</span><p className="text-gray-800 text-sm">{typeof aiExplanations[q.id].explanation === 'string' ? aiExplanations[q.id].explanation : "..."}</p></div>
+                                <div><span className="text-xs font-bold text-gray-500 uppercase flex gap-1 mb-1"><Globe size={12}/> Dịch</span><p className="text-gray-800 italic text-sm break-words whitespace-pre-wrap">{typeof aiExplanations[q.id].translation === 'string' ? aiExplanations[q.id].translation : "..."}</p></div>
+                                <div><span className="text-xs font-bold text-gray-500 uppercase flex gap-1 mb-1"><Lightbulb size={12}/> Giải thích</span><p className="text-gray-800 text-sm break-words whitespace-pre-wrap">{typeof aiExplanations[q.id].explanation === 'string' ? aiExplanations[q.id].explanation : "..."}</p></div>
                             </div>
                           </div>
                         ) : (
                           <button onClick={() => handleAiExplain(q.id, q)} disabled={explainingId === q.id} className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg transition-all">
                             {explainingId === q.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                            {explainingId === q.id ? "Đang suy nghĩ..." : "Giải thích bằng AI"}
+                            {explainingId === q.id ? "Đang suy nghĩ..." : "Giải thích bằng Trợ lí Chinhlu"}
                           </button>
                         )}
                       </div>

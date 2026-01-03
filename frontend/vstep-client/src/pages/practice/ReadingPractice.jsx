@@ -222,7 +222,7 @@ const ReadingPractice = () => {
       const data = await res.json();
       setAiExplanations(prev => ({ ...prev, [questionId]: data }));
     } catch (err) { 
-        toast.error("Lỗi AI: " + err.message);
+        toast.error("Lỗi Trợ lí Chinhlu: " + err.message);
     } finally { setExplainingId(null); }
   };
 
@@ -456,7 +456,7 @@ const ReadingPractice = () => {
                       <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl border border-indigo-100 shadow-sm overflow-hidden animate-fade-in">
                         <div className="bg-indigo-100/50 px-5 py-3 border-b border-indigo-100 flex items-center gap-2">
                            <Sparkles className="w-4 h-4 text-indigo-600" />
-                           <h4 className="font-bold text-indigo-900 text-xs uppercase tracking-wide">Gia sư AI giải thích</h4>
+                           <h4 className="font-bold text-indigo-900 text-xs uppercase tracking-wide">Trợ lí Chinhlu giải thích</h4>
                         </div>
                         <div className="p-5 space-y-4">
                            <div>
@@ -469,7 +469,7 @@ const ReadingPractice = () => {
                            </div>
                            <div>
                               <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase mb-1"><Lightbulb size={12}/> Giải thích</div>
-                              <p className="text-slate-800 text-sm">{renderSafeText(aiExplanations[q.id].explanation)}</p>
+                              <p className="text-slate-800 text-sm break-words whitespace-pre-wrap">{renderSafeText(aiExplanations[q.id].explanation)}</p>
                            </div>
                            {Array.isArray(aiExplanations[q.id].key_vocabulary) && (
                              <div className="flex flex-wrap gap-2 mt-2">
@@ -487,7 +487,7 @@ const ReadingPractice = () => {
                         className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-4 py-2 rounded-lg transition-all disabled:opacity-50"
                       >
                         {explainingId === q.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                        {explainingId === q.id ? "Đang phân tích..." : "Giải thích chi tiết bằng AI"}
+                        {explainingId === q.id ? "Đang phân tích..." : "Giải thích chi tiết bởi Trợ lí Chinhlu"}
                       </button>
                     )}
                   </div>
