@@ -142,11 +142,13 @@ const ListeningPractice = () => {
 
     // Sự kiện khi đọc xong câu hiện tại
     u.onend = () => {
+        // [QUAN TRỌNG] Kiểm tra lại Ref trước khi đọc câu tiếp theo
         if (!isCancelledRef.current && isPlayingRef.current) { 
-             setTimeout(() => playDialogue(scriptArray, index + 1), 200); 
+             setTimeout(() => playDialogue(scriptArray, index + 1), 200); // Nghỉ 200ms giữa các câu
         }
     };
 
+    // [FIX LỖI CHROME] Gán biến vào window để tránh Garbage Collection dọn mất
     window.currentUtterance = u;
     
     utteranceRef.current = u;
@@ -158,7 +160,7 @@ const ListeningPractice = () => {
     if (!testData) return;
     synthRef.current.cancel();
     isCancelledRef.current = false;
-    isPlayingRef.current = true;
+    isPlayingRef.current = true; // Đánh dấu đang active
 
     const displayTopic = topic ? topic.replace('_', ' ') : 'General'; 
     const introText = `In this part, you will hear eight short announcements or instructions.
@@ -178,9 +180,9 @@ const ListeningPractice = () => {
     synthRef.current.speak(u);
   }, [testData, level, topic]);
 
-  // 2. Bắt đầu bài nghe chính
+  // 2. Bắt đầu bài nghe chính (ưu tiên MP3 nếu có, fallback AI đọc script)
   const startMainSpeaking = useCallback(() => {
-    // 1. Trường hợp có file MP3 
+    // 1. Trường hợp có file MP3 (Ưu tiên)
     if (testData?.audio_url) {
         if (!audioRef.current) {
             audioRef.current = new Audio(testData.audio_url);
@@ -197,6 +199,7 @@ const ListeningPractice = () => {
         return;
     }
 
+    // 2. Trường hợp dùng AI đọc Script (Fallback)
     if (testData?.script_content) {
         synthRef.current.cancel();
         isCancelledRef.current = false;
@@ -220,7 +223,7 @@ const ListeningPractice = () => {
       }
       startMainSpeaking();
     } else {
-      // XEM LẠI 
+      // XEM LẠI (REVIEW MODE)
       if (testData?.audio_url && audioRef.current) {
         if (audioRef.current.paused) {
           audioRef.current.play();
@@ -230,7 +233,7 @@ const ListeningPractice = () => {
           setIsSpeaking(false);
         }
       } else {
-      
+        // Logic cho AI cũ
         if (synthRef.current.speaking) {
           if (synthRef.current.paused) { synthRef.current.resume(); setIsSpeaking(true); }
           else { synthRef.current.pause(); setIsSpeaking(false); }
@@ -287,18 +290,11 @@ const ListeningPractice = () => {
         setIsSubmitted(true);
         setShowResult(true);
         
-        // 1. Dừng bộ đọc
+        // Stop Audio hoàn toàn
         isCancelledRef.current = true; 
         isPlayingRef.current = false;
         synthRef.current.cancel();
         
-        // 2. Dừng file MP3 
-        if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0; // Đưa thời gian về 0
-        }
-        
-        // 3. Cập nhật lại các trạng thái hiển thị
         setIsSpeaking(false);
         setIsIntroSpeaking(false);
         setHasAudioEnded(false); 

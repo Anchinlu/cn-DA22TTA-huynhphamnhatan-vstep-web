@@ -4,7 +4,7 @@ import {
   Routes,
   Route,
 } from "react-router-dom";
-import { Toaster } from 'react-hot-toast'; // [MỚI] Import thư viện thông báo
+import { Toaster } from 'react-hot-toast'; 
 
 // Import các trang của bạn
 import TrangChu from './pages/TrangChu.jsx';
@@ -42,6 +42,7 @@ import AdminMockTest from './pages/admin/AdminMockTest';
 import ExamSimulation from './pages/exam/ExamSimulation';
 import QuestionBank from './pages/admin/QuestionBank';
 import ExamIntro from './pages/exam/ExamIntro';
+import MockTestResult from './pages/practice/MockTestResult';
 
 function App() {
   return (
@@ -75,6 +76,7 @@ function App() {
           <Route path="/become-teacher" element={<BecomeTeacher />} />
           <Route path="/exam/intro/:id" element={<ExamIntro />} />
           <Route path="/exam/start/:id" element={<ExamSimulation />} />
+          <Route path="/mock-test/result/:id" element={<MockTestResult />} />
           {/* class detail moved into admin area */}
           <Route path="/profile" element={<Profile />} />
           {/* === THÊM LẠI ROUTE NÀY CHO HỌC VIÊN === */}
@@ -105,6 +107,7 @@ function App() {
             <Route path="/admin/create-practice" element={<AdminPractice />} />
             <Route path="/admin/mock-test" element={<AdminMockTest />} />
             <Route path="questions" element={<QuestionBank />} />
+            
           </Route>
         </Route>
 

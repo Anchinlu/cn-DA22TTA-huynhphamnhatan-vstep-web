@@ -3,10 +3,59 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import pool from "../config/database.js";
+import { OAuth2Client } from 'google-auth-library';
 import transporter from "../config/email.js";
 import { JWT_SECRET } from "../utils/constants.js";
 
 const router = express.Router();
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+router.post("/auth/google", async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    // 1. Xác thực ID Token với Google
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    
+    const { email, name } = ticket.getPayload();
+    const [users] = await pool.query("SELECT * FROM nguoi_dung WHERE email = ?", [email]);
+    
+    let user;
+    if (users.length === 0) {
+      const [result] = await pool.query(
+        "INSERT INTO nguoi_dung (ho_ten, email, mat_khau, vai_tro_id, ngay_tao) VALUES (?, ?, ?, ?, NOW())",
+        [name, email, 'google_authenticated', 1] 
+      );
+      
+      const [newUser] = await pool.query("SELECT * FROM nguoi_dung WHERE user_id = ?", [result.insertId]);
+      user = newUser[0];
+    } else {
+      user = users[0];
+    }
+    const systemToken = jwt.sign(
+      { userId: user.user_id, vaiTroId: user.vai_tro_id },
+      JWT_SECRET,
+      { expiresIn: "24h" }
+    );
+
+    res.status(200).json({
+      message: "Đăng nhập Google thành công",
+      token: systemToken,
+      user: { 
+        id: user.user_id, 
+        hoTen: user.ho_ten, 
+        email: user.email, 
+        vaiTroId: user.vai_tro_id 
+      },
+    });
+
+  } catch (err) {
+    console.error("Google Auth Error:", err);
+    res.status(500).json({ message: "Xác thực Google thất bại" });
+  }
+});
 
 // Đăng Nhập
 router.post("/login", async (req, res) => {

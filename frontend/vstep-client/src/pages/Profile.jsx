@@ -3,7 +3,7 @@ import {
   User, Mail, Calendar, LogOut, 
   Trophy, Target, Clock, Activity,
   Headphones, BookOpen, PenTool, Mic,
-  History, Award, ChevronRight, ClipboardList
+  History, Award, ChevronRight, ClipboardList, Settings2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
@@ -13,28 +13,23 @@ import toast from 'react-hot-toast';
 const Profile = () => {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
-  const [mockHistory, setMockHistory] = useState([]); // [MỚI] State cho kết quả thi thử
+  const [mockHistory, setMockHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // --- GIỮ NGUYÊN LOGIC FETCH DỮ LIỆU ---
   useEffect(() => {
     const fetchAllData = async () => {
       const token = localStorage.getItem('vstep_token');
       if (!token) { navigate('/dang-nhap'); return; }
-
       try {
-        // 1. Fetch thông tin Profile & Thống kê lẻ
         const statsRes = await fetch('http://localhost:5000/api/profile/stats', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
-        // 2. [MỚI] Fetch lịch sử thi thử từ bảng ket_qua_thi_thu
         const mockRes = await fetch('http://localhost:5000/api/mock-tests/history', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-
         if (statsRes.ok) setData(await statsRes.json());
         if (mockRes.ok) setMockHistory(await mockRes.json());
-
       } catch (err) {
         console.error(err);
         toast.error("Lỗi kết nối máy chủ.");
@@ -52,53 +47,56 @@ const Profile = () => {
     navigate('/dang-nhap');
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-500 font-medium italic">Đang tải thông tin cá nhân...</div>;
-  if (!data) return <div className="min-h-screen flex items-center justify-center text-red-500 font-bold">Không thể tải dữ liệu hồ sơ.</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-500 font-bold animate-pulse uppercase tracking-widest text-xs">Đang tải hồ sơ...</div>;
+  if (!data) return <div className="min-h-screen flex items-center justify-center text-rose-500 font-bold">Không thể tải dữ liệu hồ sơ.</div>;
 
   const { user, stats, recent_activity } = data;
   const formatScore = (score) => score ? Number(score).toFixed(1) : '0.0';
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans flex flex-col">
+    <div className="min-h-screen bg-white font-sans flex flex-col">
       <Header />
       
       <main className="flex-grow pt-24 pb-12 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto space-y-8">
           
-          {/* HEADER PROFILE (Giữ nguyên) */}
-          <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
+          {/* 1. HEADER PROFILE - Tối giản, chuyên nghiệp */}
+          <div className="border border-slate-200 rounded-lg p-6 flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-6">
-              <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg border-4 border-white">
+              <div className="w-20 h-20 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 text-3xl font-black border border-slate-200">
                 {user.ho_ten.charAt(0).toUpperCase()}
               </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">{user.ho_ten}</h1>
-                <div className="flex flex-col sm:flex-row gap-3 mt-2 text-gray-500 text-sm">
-                  <span className="flex items-center gap-1"><Mail size={14}/> {user.email}</span>
-                  <span className="flex items-center gap-1"><Calendar size={14}/> Tham gia: {new Date(user.ngay_tao).toLocaleDateString('vi-VN')}</span>
+              <div className="text-center md:text-left">
+                <h1 className="text-2xl font-black text-slate-900 leading-tight uppercase tracking-tight">{user.ho_ten}</h1>
+                <div className="flex flex-col sm:flex-row gap-4 mt-1 text-slate-400 font-medium text-xs">
+                  <span className="flex items-center gap-1.5"><Mail size={14}/> {user.email}</span>
+                  <span className="flex items-center gap-1.5"><Calendar size={14}/> Tham gia: {new Date(user.ngay_tao).toLocaleDateString('vi-VN')}</span>
                 </div>
               </div>
             </div>
-            <button onClick={handleLogout} className="px-6 py-2 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 font-bold flex items-center gap-2 transition active:scale-95">
-              <LogOut size={18}/> Đăng xuất
+            <button onClick={handleLogout} className="flex items-center gap-2 px-5 py-2 border border-slate-200 rounded text-xs font-black uppercase text-slate-500 hover:bg-slate-50 hover:text-rose-600 hover:border-rose-200 transition-all">
+              <LogOut size={14}/> Đăng xuất
             </button>
           </div>
 
-          {/* THỐNG KÊ TỔNG QUAN (Giữ nguyên) */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <StatCard icon={Trophy} color="text-yellow-600" bg="bg-yellow-50" label="Điểm trung bình" value={formatScore(stats.overall_avg)} />
-            <StatCard icon={Activity} color="text-blue-600" bg="bg-blue-50" label="Tổng bài thi" value={stats.total_tests} />
-            <StatCard icon={Clock} color="text-purple-600" bg="bg-purple-50" label="Giờ học tập" value={`${Math.round((stats.total_time || 0) / 60)} phút`} />
-            <StatCard icon={Target} color="text-green-600" bg="bg-green-50" label="Mục tiêu" value="B1/B2" />
+          {/* 2. THỐNG KÊ TỔNG QUAN - Grid vuông vức */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard icon={Trophy} label="GPA Trung bình" value={formatScore(stats.overall_avg)} />
+            <StatCard icon={Activity} label="Tổng bài thi" value={stats.total_tests} />
+            <StatCard icon={Clock} label="Phút học tập" value={Math.round((stats.total_time || 0) / 60)} />
+            <StatCard icon={Target} label="Trình độ" value="B1/B2" />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
-            <div className="lg:col-span-2 space-y-8">
+            {/* CỘT TRÁI (8/12): CHÍNH */}
+            <div className="lg:col-span-8 space-y-8">
               
-              {/* PHẦN 1: NĂNG LỰC KỸ NĂNG LẺ (Giữ nguyên) */}
-              <section>
-                <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2"><Target className="text-indigo-500"/> Năng lực từng kỹ năng</h2>
+              {/* NĂNG LỰC KỸ NĂNG LẺ - Nơi tập trung màu sắc */}
+              <section className="space-y-4">
+                <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 ml-1">
+                    <Settings2 size={14}/> Thống kê năng lực thực tế
+                </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <SkillCard title="Listening" icon={Headphones} color="blue" score={formatScore(stats.listening_avg)} count={stats.listening_count} />
                   <SkillCard title="Reading" icon={BookOpen} color="emerald" score={formatScore(stats.reading_avg)} count={stats.reading_count} />
@@ -107,61 +105,60 @@ const Profile = () => {
                 </div>
               </section>
 
-              {/* [MỚI] PHẦN 2: LỊCH SỬ THI THỬ (FULL 4 KỸ NĂNG) */}
-              <section className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                        <Award className="text-purple-600"/> Lịch sử Mock Test (Full 4 kĩ năng)
+              {/* LỊCH SỬ THI THỬ (FULL 4 KỸ NĂNG) - Tối giản dạng Table row */}
+              <section className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                        <Award size={16}/> Lịch sử Mock Test (Full Skills)
                     </h2>
-                    <span className="bg-purple-100 text-purple-700 text-xs font-bold px-3 py-1 rounded-full">{mockHistory.length} bài thi</span>
+                    <span className="text-[10px] font-black text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded uppercase tracking-tighter">{mockHistory.length} bài</span>
                 </div>
                 
-                <div className="p-6">
-                    {mockHistory.length > 0 ? (
-                        <div className="space-y-4">
-                            {mockHistory.map((test, idx) => (
-                                <div key={test.id} className="group p-5 bg-white border border-gray-100 rounded-2xl hover:border-purple-200 hover:shadow-md transition-all">
-                                    <div className="flex flex-col md:flex-row justify-between gap-4">
-                                        <div className="flex gap-4">
-                                            <div className="w-14 h-14 bg-purple-50 text-purple-600 rounded-xl flex flex-col items-center justify-center border border-purple-100">
-                                                <span className="text-xs font-bold leading-none uppercase">Avg</span>
-                                                <span className="text-xl font-black">{formatScore(test.overall_score)}</span>
-                                            </div>
-                                            <div>
-                                                <h4 className="font-bold text-gray-800 group-hover:text-purple-700 transition-colors">VSTEP Mock Test #{test.id}</h4>
-                                                <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                                                    <Calendar size={12}/> {new Date(test.ngay_thi).toLocaleDateString('vi-VN')} 
-                                                    <span className="mx-2">•</span> 
-                                                    <Clock size={12}/> 120 phút
-                                                </p>
-                                                
-                                                {/* Điểm chi tiết 4 kỹ năng */}
-                                                <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3">
-                                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"></div><span className="text-xs font-bold text-gray-600">L: {formatScore(test.listening_score)}</span></div>
-                                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="text-xs font-bold text-gray-600">R: {formatScore(test.reading_score)}</span></div>
-                                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-500"></div><span className="text-xs font-bold text-gray-600">W: {formatScore(test.writing_score)}</span></div>
-                                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-orange-500"></div><span className="text-xs font-bold text-gray-600">S: {formatScore(test.speaking_score)}</span></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                <div className="divide-y divide-slate-100">
+                    {mockHistory.length > 0 ? mockHistory.map((test) => (
+                        <div key={test.id} className="p-4 hover:bg-slate-50/50 transition-colors flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4 flex-1">
+                                <div className="w-12 h-12 bg-white border border-slate-200 rounded flex flex-col items-center justify-center">
+                                    <span className="text-[9px] font-black text-slate-400 leading-none">AVG</span>
+                                    <span className="text-base font-black text-slate-900">{formatScore(test.overall_score)}</span>
                                 </div>
-                            ))}
+                                <div>
+                                    <h4 className="text-sm font-bold text-slate-800">VSTEP Mock Test #{test.id}</h4>
+                                    <p className="text-[10px] text-slate-400 font-medium flex items-center gap-3 mt-0.5">
+                                        <span className="flex items-center gap-1"><Calendar size={10}/> {new Date(test.ngay_thi).toLocaleDateString('vi-VN')}</span>
+                                        <span className="flex items-center gap-1"><Clock size={10}/> 120'</span>
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            {/* Điểm nhỏ 4 kỹ năng */}
+                            <div className="hidden sm:flex items-center gap-3 mr-4">
+                                <MiniScore color="bg-blue-500" val={formatScore(test.listening_score)} />
+                                <MiniScore color="bg-emerald-500" val={formatScore(test.reading_score)} />
+                                <MiniScore color="bg-indigo-500" val={formatScore(test.writing_score)} />
+                                <MiniScore color="bg-orange-500" val={formatScore(test.speaking_score)} />
+                            </div>
+
+                            <button onClick={() => navigate(`/mock-test/result/${test.id}`)} className="p-2 text-slate-300 hover:text-indigo-600 transition-colors">
+                                <ChevronRight size={18} />
+                            </button>
                         </div>
-                    ) : (
-                        <div className="py-12 flex flex-col items-center text-center">
-                            <ClipboardList size={48} className="text-gray-200 mb-3" />
-                            <p className="text-gray-400 text-sm font-medium">Bạn chưa thực hiện bài thi thử Full kỹ năng nào.</p>
-                            <button onClick={() => navigate('/mock-tests')} className="mt-4 text-indigo-600 font-bold text-sm hover:underline italic underline-offset-4">Bắt đầu thi ngay →</button>
+                    )) : (
+                        <div className="py-12 flex flex-col items-center justify-center text-center">
+                            <ClipboardList size={40} className="text-slate-100 mb-2" />
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Chưa có bài thi nào</p>
+                            <button onClick={() => navigate('/mock-tests')} className="mt-2 text-indigo-600 text-xs font-black uppercase hover:underline">Thi ngay →</button>
                         </div>
                     )}
                 </div>
               </section>
 
-              {/* BIỂU ĐỒ (Giữ nguyên) */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="font-bold text-gray-800 mb-4">Biểu đồ tiến bộ (Practice)</h3>
-                <div className="space-y-4">
+              {/* BIỂU ĐỒ TIẾN BỘ */}
+              <div className="border border-slate-200 rounded-lg p-6 space-y-5">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Activity size={14}/> Phân tích tiến độ học tập
+                </h3>
+                <div className="space-y-5">
                   <ProgressBar label="Listening" score={stats.listening_avg} color="bg-blue-500" />
                   <ProgressBar label="Reading" score={stats.reading_avg} color="bg-emerald-500" />
                   <ProgressBar label="Writing" score={stats.writing_avg} color="bg-indigo-500" />
@@ -170,30 +167,32 @@ const Profile = () => {
               </div>
             </div>
 
-            {/* CỘT PHẢI: HOẠT ĐỘNG GẦN ĐÂY (Luyện tập lẻ) */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit sticky top-24">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <History size={18} className="text-gray-400"/> Luyện tập gần đây
-              </h3>
-              <div className="space-y-4">
-                {recent_activity.length > 0 ? recent_activity.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition border-b border-gray-50 last:border-0">
-                    <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{item.ky_nang}</p>
-                      <p className="text-sm font-bold text-gray-700 line-clamp-1">{item.tieu_de_bai_thi}</p>
-                      <p className="text-[10px] text-gray-400">{item.ngay_lam}</p>
+            {/* CỘT PHẢI (4/12): HOẠT ĐỘNG GẦN ĐÂY */}
+            <div className="lg:col-span-4">
+                <div className="border border-slate-200 rounded-lg p-5 sticky top-24 space-y-4">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <History size={16}/> Luyện tập gần đây
+                    </h3>
+                    <div className="space-y-1">
+                        {recent_activity.length > 0 ? recent_activity.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded transition-colors group">
+                            <div className="min-w-0">
+                                <p className="text-[8px] font-black text-slate-300 uppercase tracking-tighter group-hover:text-slate-500 transition-colors">{item.ky_nang}</p>
+                                <p className="text-xs font-bold text-slate-700 truncate pr-2">{item.tieu_de_bai_thi}</p>
+                                <p className="text-[9px] text-slate-400 font-mono">{item.ngay_lam}</p>
+                            </div>
+                            <div className={`font-black text-sm w-10 text-right ${item.diem_so >= 5 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                {item.diem_so}
+                            </div>
+                        </div>
+                        )) : (
+                            <p className="text-slate-300 text-[10px] font-bold text-center py-10 uppercase tracking-widest">Trống</p>
+                        )}
                     </div>
-                    <div className={`font-black text-lg ${item.diem_so >= 5 ? 'text-green-600' : 'text-red-500'}`}>
-                      {item.diem_so}
-                    </div>
-                  </div>
-                )) : (
-                  <p className="text-gray-400 text-sm text-center py-4 italic">Chưa có bài luyện tập lẻ.</p>
-                )}
-              </div>
-              <button onClick={() => navigate('/practice')} className="w-full mt-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-100 text-sm">
-                Luyện tập thêm
-              </button>
+                    <button onClick={() => navigate('/practice')} className="w-full mt-4 py-2.5 bg-slate-900 text-white font-black uppercase text-[10px] tracking-widest rounded hover:bg-slate-800 transition-all shadow-sm">
+                        Khám phá bài tập mới
+                    </button>
+                </div>
             </div>
 
           </div>
@@ -204,48 +203,52 @@ const Profile = () => {
   );
 };
 
-// Component con (Giữ nguyên)
-const StatCard = ({ icon: Icon, color, bg, label, value }) => (
-  <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 transition-transform hover:-translate-y-1">
-    <div className={`p-3 rounded-xl ${bg} ${color}`}>
-      <Icon size={24} />
-    </div>
-    <div>
-      <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest leading-none mb-1">{label}</p>
-      <p className="text-xl font-black text-gray-800 leading-none">{value}</p>
-    </div>
+// --- CÁC COMPONENT CON TINH CHỈNH ---
+
+const StatCard = ({ icon: Icon, label, value }) => (
+  <div className="bg-white p-4 border border-slate-200 rounded flex flex-col justify-center items-center text-center transition-all hover:border-slate-400">
+    <Icon size={18} className="text-slate-300 mb-2" />
+    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1">{label}</p>
+    <p className="text-lg font-black text-slate-900 leading-none">{value}</p>
   </div>
+);
+
+const MiniScore = ({ color, val }) => (
+    <div className="flex items-center gap-1">
+        <div className={`w-1.5 h-1.5 rounded-full ${color}`}></div>
+        <span className="text-[10px] font-black text-slate-600">{val}</span>
+    </div>
 );
 
 const SkillCard = ({ title, icon: Icon, color, score, count }) => {
   const colorMap = {
-    blue: 'bg-blue-50 text-blue-600 border-blue-100',
-    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
-    orange: 'bg-orange-50 text-orange-600 border-orange-100'
+    blue: 'border-blue-200 text-blue-600 bg-blue-50/30',
+    emerald: 'border-emerald-200 text-emerald-600 bg-emerald-50/30',
+    indigo: 'border-indigo-200 text-indigo-600 bg-indigo-50/30',
+    orange: 'border-orange-200 text-orange-600 bg-orange-50/30'
   };
 
   return (
-    <div className={`p-5 rounded-2xl border flex flex-col justify-between h-32 transition hover:shadow-md hover:-translate-y-1 ${colorMap[color]}`}>
+    <div className={`p-4 rounded border flex flex-col justify-between h-28 transition-all hover:shadow-sm ${colorMap[color]}`}>
       <div className="flex justify-between items-start">
-        <div className="font-bold text-lg flex items-center gap-2">
-          <Icon size={20}/> {title}
+        <div className="font-black text-sm uppercase tracking-tight flex items-center gap-2">
+          <Icon size={16} strokeWidth={2.5}/> {title}
         </div>
-        <span className="text-[10px] font-bold bg-white/60 px-2 py-1 rounded-md uppercase">{count} bài</span>
+        <span className="text-[9px] font-black bg-white border border-inherit px-1.5 py-0.5 rounded tracking-tighter uppercase">{count} tests</span>
       </div>
-      <div className="text-4xl font-black">{score}<span className="text-sm font-medium opacity-60">/10</span></div>
+      <div className="text-3xl font-black tabular-nums">{score}<span className="text-xs font-medium opacity-50 ml-0.5">/10</span></div>
     </div>
   );
 };
 
 const ProgressBar = ({ label, score, color }) => (
-  <div className="group">
-    <div className="flex justify-between text-xs font-bold text-gray-500 mb-1.5 group-hover:text-gray-700">
+  <div className="space-y-1.5">
+    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
       <span>{label}</span>
-      <span>{score ? Number(score).toFixed(1) : 0}/10</span>
+      <span className="text-slate-900">{score ? Number(score).toFixed(1) : 0}/10</span>
     </div>
-    <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-      <div className={`h-2.5 rounded-full transition-all duration-1000 ${color}`} style={{ width: `${(score || 0) * 10}%` }}></div>
+    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+      <div className={`h-full rounded-full transition-all duration-1000 ${color}`} style={{ width: `${(score || 0) * 10}%` }}></div>
     </div>
   </div>
 );

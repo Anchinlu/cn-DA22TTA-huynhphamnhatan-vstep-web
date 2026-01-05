@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Upload, FileSpreadsheet, FileAudio, Save, 
-  Plus, Check, X, Layers, AlertCircle, Eye, Loader2, FileText, Bot 
+  Plus, Check, X, Layers, AlertCircle, Eye, Loader2, FileText, Bot, 
+  Settings2, Tag, LayoutDashboard, Sparkles, ListChecks, CheckCircle2
 } from 'lucide-react';
-import toast from 'react-hot-toast';
-import Header from '../../components/Header'; 
+import toast from 'react-hot-toast'; 
 
 const AdminPractice = () => {
   // --- STATE CẤU HÌNH ---
@@ -13,49 +13,54 @@ const AdminPractice = () => {
   const [topicId, setTopicId] = useState('');
   const [taskType, setTaskType] = useState('task1'); 
   const [part, setPart] = useState('1'); 
-  
-  // --- STATE DỮ LIỆU ---
   const [title, setTitle] = useState('');
-
   const [content, setContent] = useState(''); 
   const [scriptContent, setScriptContent] = useState(''); 
-  
-  // Upload Excel (Câu hỏi)
-  const [excelFile, setExcelFile] = useState(null);
   const [questions, setQuestions] = useState([]); 
-
-  // --- STATE DỮ LIỆU BỔ SUNG ---
   const [audioUrl, setAudioUrl] = useState(null); 
   const [listeningMode, setListeningMode] = useState('ai'); 
-  
-  // --- STATE AI SOẠN CÂU HỎI (Chỉ cho Reading) ---
   const [questionCount, setQuestionCount] = useState(5); 
   const [isGenerating, setIsGenerating] = useState(false);
-  
-  // --- STATE HỖ TRỢ ---
   const [topics, setTopics] = useState([]);
   const [isAddingTopic, setIsAddingTopic] = useState(false);
   const [newTopicName, setNewTopicName] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 1. Load danh sách Chủ đề
+  // Cấu hình Theme theo kỹ năng (Square style)
+  const skillThemes = {
+    reading: { color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', btn: 'bg-emerald-600', label: 'Reading (Đọc hiểu)' },
+    listening: { color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', btn: 'bg-blue-600', label: 'Listening (Nghe hiểu)' },
+    writing: { color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100', btn: 'bg-violet-600', label: 'Writing (Viết)' },
+    speaking: { color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100', btn: 'bg-orange-600', label: 'Speaking (Nói)' },
+  };
+
+  const currentTheme = skillThemes[skill];
+
   useEffect(() => {
-    const token = localStorage.getItem('vstep_token');
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    fetch('http://localhost:5000/api/admin/topics', { headers })
-      .then(res => res.json())
-      .then(data => setTopics(data))
-      .catch(err => console.error("Lỗi load topic:", err));
+    fetchTopics();
   }, []);
 
-  // 2. Thêm chủ đề mới
+  const fetchTopics = async () => {
+    try {
+      const token = localStorage.getItem('vstep_token');
+      const res = await fetch('http://localhost:5000/api/admin/topics', { 
+        headers: token ? { Authorization: `Bearer ${token}` } : {} 
+      });
+      const data = await res.json();
+      setTopics(data);
+    } catch (err) { console.error("Lỗi load topic:", err); }
+  };
+
   const handleAddTopic = async () => {
     if (!newTopicName.trim()) return;
     try {
       const token = localStorage.getItem('vstep_token');
       const res = await fetch('http://localhost:5000/api/admin/topics', {
         method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, token ? { Authorization: `Bearer ${token}` } : {}),
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ name: newTopicName })
       });
       const data = await res.json();
@@ -65,18 +70,13 @@ const AdminPractice = () => {
         setIsAddingTopic(false);
         setNewTopicName('');
         toast.success("Đã thêm chủ đề mới!");
-      } else {
-        toast.error(data.message);
       }
     } catch (err) { toast.error("Lỗi kết nối"); }
   };
 
-  // 3. Xử lý Upload Excel & Preview
   const handleExcelUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
-    setExcelFile(file);
     const formData = new FormData();
     formData.append('file', file);
     const loadToast = toast.loading("Đang đọc file Excel...");
@@ -84,54 +84,42 @@ const AdminPractice = () => {
       const token = localStorage.getItem('vstep_token');
       const res = await fetch('http://localhost:5000/api/admin/preview-excel', {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
       const data = await res.json();
-
       if (res.ok) {
         setQuestions(data.data); 
-        toast.success(`Đã đọc được ${data.total} câu hỏi!`, { id: loadToast });
-      } else {
-        toast.error("Lỗi đọc file: " + data.message, { id: loadToast });
+        toast.success(`Đã nhận ${data.total} câu hỏi!`, { id: loadToast });
       }
     } catch (err) { toast.error("Lỗi server", { id: loadToast }); }
   };
 
-  // 1. Tải file MP3 lên Cloudinary
   const handleAudioUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
     const formData = new FormData();
     formData.append('file', file);
-    const loadToast = toast.loading("Đang tải file âm thanh...");
-
+    const loadToast = toast.loading("Đang tải audio...");
     try {
       const token = localStorage.getItem('vstep_token');
       const res = await fetch('http://localhost:5000/api/admin/upload-media', {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
       const data = await res.json();
       if (res.ok) {
         setAudioUrl(data.url);
-        toast.success("Đã tải audio thành công!", { id: loadToast });
-      } else {
-        toast.error(data.message || 'Lỗi xác thực', { id: loadToast });
+        toast.success("Tải audio thành công!", { id: loadToast });
       }
-    } catch (err) { toast.error("Lỗi kết nối server", { id: loadToast }); }
+    } catch (err) { toast.error("Lỗi server", { id: loadToast }); }
   };
 
-  // 2. AI Soạn câu hỏi (Chỉ áp dụng cho Reading)
   const handleAIGenerate = async () => {
-    if (skill !== 'reading') return;
-    if (!content || content.length < 100) return toast.error("Nội dung bài đọc quá ngắn để AI soạn đề.");
-
+    if (skill !== 'reading' || !content) return toast.error("Thiếu nội dung bài đọc");
     setIsGenerating(true);
-    const loadToast = toast.loading(`AI đang soạn ${questionCount} câu hỏi Reading...`);
-
+    const loadToast = toast.loading("AI đang soạn câu hỏi...");
     try {
       const res = await fetch('http://localhost:5000/api/ai/generate-questions', {
         method: 'POST',
@@ -139,367 +127,298 @@ const AdminPractice = () => {
         body: JSON.stringify({ content, type: 'reading', level, count: questionCount })
       });
       const data = await res.json();
-
-      if (res.status === 422) { // Logic nội dung không đủ
-        toast.error(data.message, { id: loadToast, duration: 5000 });
-      } else if (res.ok) {
-        // backend returns { questions: [...] }
+      if (res.ok) {
         setQuestions(data.questions || []);
-        toast.success("Đã hoàn thành soạn đề!", { id: loadToast });
-      } else {
-        toast.error(data.message || 'Lỗi Hệ thống', { id: loadToast });
+        toast.success("AI đã soạn xong!", { id: loadToast });
       }
-    } catch (err) { toast.error("Lỗi kết nối Hệ thống", { id: loadToast }); }
+    } catch (err) { toast.error("Lỗi AI", { id: loadToast }); }
     finally { setIsGenerating(false); }
   };
 
-  // 4. LƯU ĐỀ THI (Submit Form)
   const handleSubmit = async () => {
-    if (!title || !topicId) return toast.error("Vui lòng nhập tiêu đề và chọn chủ đề");
-    
-    // Validate riêng từng kỹ năng
-    if (skill === 'reading' && !content) return toast.error("Chưa nhập nội dung bài đọc!");
-    if (skill === 'writing' && !content) return toast.error("Chưa nhập đề bài chi tiết!");
-    if (skill === 'speaking' && !content) return toast.error("Chưa nhập câu hỏi nói!"); 
-    
-    if (skill === 'listening') {
-      if (listeningMode === 'ai' && !scriptContent) return toast.error("Chưa nhập kịch bản Script");
-      if (listeningMode === 'mp3' && !audioUrl) return toast.error("Chưa tải file MP3 lên hoặc chưa chọn file!");
-    }
-    
-    if ((skill === 'reading' || skill === 'listening') && questions.length === 0) return toast.error("Chưa có câu hỏi trắc nghiệm!");
-
+    if (!title || !topicId) return toast.error("Thiếu Tiêu đề hoặc Chủ đề");
     setLoading(true);
-    
     const payload = {
-      title, level, topic_id: topicId,
-      questions,
-      
-      // Mapping dữ liệu
-      content: (skill === 'reading' || skill === 'writing' || skill === 'speaking') ? content : null,
-      script_content: skill === 'listening' && listeningMode === 'ai' ? scriptContent : null,
+      title, level, topic_id: topicId, questions,
+      content: (skill !== 'listening') ? content : null,
+      script_content: skill === 'listening' ? scriptContent : null,
       audio_url: skill === 'listening' && listeningMode === 'mp3' ? audioUrl : null,
-      
       task_type: skill === 'writing' ? taskType : null,
       part: skill === 'speaking' ? part : null,
     };
-
-    const endpoint = skill === 'listening' ? '/create-listening' : 
-                     skill === 'reading' ? '/create-reading' : 
-                     skill === 'writing' ? '/create-writing' : '/create-speaking';
-
+    const endpoint = `/create-${skill}`;
     try {
       const token = localStorage.getItem('vstep_token');
       const res = await fetch(`http://localhost:5000/api/admin${endpoint}`, {
         method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, token ? { Authorization: `Bearer ${token}` } : {}),
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      
       if (res.ok) {
-        toast.success(`Tạo đề ${skill.toUpperCase()} thành công!`);
-        // Reset form
-        setQuestions([]); setTitle(''); setContent(''); setScriptContent(''); setExcelFile(null); setAudioUrl(null);
-      } else {
-        toast.error("Lỗi: " + (data.message || data.error));
+        toast.success("Tạo đề thi thành công!");
+        setTitle(''); setContent(''); setScriptContent(''); setQuestions([]); setAudioUrl(null);
       }
-    } catch (err) { toast.error("Lỗi kết nối server"); }
+    } catch (err) { toast.error("Lỗi lưu đề"); }
     finally { setLoading(false); }
   };
 
-  // Helper text cho placeholder
-  const getPlaceholder = () => {
-      if (skill === 'reading') return "Nhập nội dung bài đọc";
-      if (skill === 'writing') return "Nội dung đề bài viết chi tiết ";
-      if (skill === 'speaking') return "Nhập câu hỏi Speaking vào đây ";
-      return "";
-  };
-
-  const getLabel = () => {
-      if (skill === 'reading') return "Nội dung bài đọc";
-      if (skill === 'writing') return "Nội dung đề bài (Chi tiết)";
-      if (skill === 'speaking') return "Câu hỏi Speaking";
-      return "Nội dung";
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
-      <Header />
+    <div className="max-w-7xl mx-auto p-8 space-y-6 bg-white min-h-screen font-sans animate-in fade-in duration-500">
       
-      <main className="pt-24 pb-12 px-4 max-w-6xl mx-auto">
-        
-        {/* HEADER TRANG */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-800">Quản lý Đề thi</h1>
-            <p className="text-slate-500">Tạo đề luyện tập cho Reading, Listening, Writing & Speaking</p>
-          </div>
-          <button 
-            onClick={handleSubmit} 
-            disabled={loading}
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg flex items-center gap-2 transition disabled:bg-slate-400"
-          >
-            {loading ? <><Loader2 className="animate-spin"/> Đang lưu...</> : <><Save size={20}/> Lưu Đề Thi</>}
-          </button>
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <Plus className="text-indigo-600" size={24} />
+            Soạn Đề thi Mới
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">Hệ thống khởi tạo nội dung luyện tập VSTEP AI</p>
         </div>
+        <div className="flex items-center gap-3">
+            <button 
+                onClick={() => window.history.back()}
+                className="px-4 py-2 border border-slate-200 rounded text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all"
+            >
+                Hủy bỏ
+            </button>
+            <button 
+                onClick={handleSubmit} 
+                disabled={loading}
+                className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded text-sm font-bold hover:bg-slate-800 transition-all shadow-sm disabled:bg-slate-300"
+            >
+                {loading ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>}
+                Lưu Đề Thi
+            </button>
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* SIDEBAR CẤU HÌNH (4/12) */}
+        <div className="lg:col-span-4 space-y-6">
           
-          {/* CỘT TRÁI: CẤU HÌNH (1/3) */}
-          <div className="space-y-6">
+          {/* Cấu hình cơ bản */}
+          <div className="border border-slate-200 rounded p-5 space-y-4">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <Settings2 size={14}/> Thiết lập bài thi
+            </h3>
             
-            {/* Card 1: Loại bài thi */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><Layers size={18}/> Cấu hình</h3>
-              
-              <div className="space-y-4">
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">Kỹ năng mục tiêu</label>
+                <select 
+                  value={skill} onChange={(e) => setSkill(e.target.value)}
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-sm outline-none focus:border-indigo-500 font-medium"
+                >
+                  <option value="reading">Reading (Đọc hiểu)</option>
+                  <option value="listening">Listening (Nghe hiểu)</option>
+                  <option value="writing">Writing (Viết)</option>
+                  <option value="speaking">Speaking (Nói)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-bold text-gray-600 mb-1">Kỹ năng</label>
-                  <select 
-                    value={skill} onChange={(e) => setSkill(e.target.value)}
-                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
-                  >
-                    <option value="reading">Reading (Đọc)</option>
-                    <option value="listening">Listening (Nghe)</option>
-                    <option value="writing">Writing (Viết)</option>
-                    <option value="speaking">Speaking (Nói)</option>
+                  <label className="text-xs font-bold text-slate-600 mb-1 block">Trình độ</label>
+                  <select value={level} onChange={(e) => setLevel(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-sm outline-none font-medium">
+                    <option value="B1">B1</option><option value="B2">B2</option><option value="C1">C1</option>
                   </select>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                {skill === 'writing' && (
                   <div>
-                    <label className="block text-sm font-bold text-gray-600 mb-1">Trình độ</label>
-                    <select 
-                      value={level} onChange={(e) => setLevel(e.target.value)}
-                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none"
-                    >
-                      <option value="B1">B1</option>
-                      <option value="B2">B2</option>
-                      <option value="C1">C1</option>
+                    <label className="text-xs font-bold text-slate-600 mb-1 block">Dạng bài</label>
+                    <select value={taskType} onChange={(e) => setTaskType(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-sm outline-none font-medium">
+                      <option value="task1">Task 1 (Thư)</option><option value="task2">Task 2 (Luận)</option>
                     </select>
                   </div>
-                  
-                  {/* Dropdown thay đổi theo Skill */}
-                  {skill === 'writing' && (
-                    <div>
-                      <label className="block text-sm font-bold text-gray-600 mb-1">Dạng bài</label>
-                      <select value={taskType} onChange={(e) => setTaskType(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none">
-                        <option value="task1">Task 1 (Thư)</option>
-                        <option value="task2">Task 2 (Luận)</option>
-                      </select>
-                    </div>
-                  )}
-                  {skill === 'speaking' && (
-                    <div>
-                      <label className="block text-sm font-bold text-gray-600 mb-1">Phần thi</label>
-                      <select value={part} onChange={(e) => setPart(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none">
-                        <option value="1">Part 1</option>
-                        <option value="2">Part 2</option>
-                        <option value="3">Part 3</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Card 2: Chủ đề */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-gray-800">Chủ đề</h3>
-                <button onClick={() => setIsAddingTopic(!isAddingTopic)} className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1">
-                  {isAddingTopic ? "Hủy" : "+ Thêm mới"}
-                </button>
-              </div>
-
-              {isAddingTopic ? (
-                <div className="flex gap-2 mb-4 animate-fade-in">
-                  <input 
-                    type="text" placeholder="Tên chủ đề..." 
-                    className="flex-1 p-2 border border-indigo-300 rounded-lg text-sm focus:outline-none"
-                    value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)}
-                  />
-                  <button onClick={handleAddTopic} className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"><Check size={16}/></button>
-                </div>
-              ) : (
-                <select 
-                  value={topicId} onChange={(e) => setTopicId(e.target.value)}
-                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none mb-2"
-                >
-                  <option value="">-- Chọn chủ đề --</option>
-                  {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              )}
-            </div>
-
-            {/* Card 3:Chỉ hiện khi chọn Reading) */}
-            {skill === 'reading' && (
-              <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-6 rounded-3xl text-white shadow-lg">
-                <h3 className="font-bold mb-4 flex items-center gap-2"><Bot size={20}/> Trợ lý soạn đề AI</h3>
-                <label className="block text-xs font-bold uppercase opacity-80 mb-2">Số lượng câu: {questionCount}</label>
-                <input type="range" min="1" max="10" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full accent-white mb-6" />
-                <button 
-                  onClick={handleAIGenerate} 
-                  disabled={isGenerating}
-                  className="w-full py-3 bg-white text-indigo-600 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-50 transition"
-                >
-                  {isGenerating ? <Loader2 className="animate-spin" size={18}/> : <Bot size={18}/>} AI Tự soạn câu hỏi
-                </button>
-              </div>
-            )}
-
-          </div>
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* Input Tiêu đề */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <label className="block text-sm font-bold text-gray-600 mb-2">Tiêu đề bài thi (Tên gọi)</label>
-              <input 
-                type="text" 
-                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-lg font-semibold focus:ring-2 focus:ring-indigo-500 outline-none"
-                placeholder={`VD: ${skill === 'listening' ? 'Listening Test 01' : 'Writing Task 1 - Email...'}`}
-                value={title} onChange={(e) => setTitle(e.target.value)}
-              />
-            </div>
-
-            {/* KHU VỰC NỘI DUNG CHÍNH */}
-            
-            {/* 1. LISTENING: Linh hoạt Script hoặc MP3 */}
-            {skill === 'listening' && (
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-                <div className="flex bg-gray-100 p-1 rounded-2xl mb-6 w-fit">
-                   <button 
-                     onClick={() => setListeningMode('ai')} 
-                     className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${listeningMode === 'ai' ? 'bg-white text-indigo-600 shadow' : 'text-gray-400'}`}
-                   >
-                     AI Script
-                   </button>
-                   <button 
-                     onClick={() => setListeningMode('mp3')} 
-                     className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${listeningMode === 'mp3' ? 'bg-white text-indigo-600 shadow' : 'text-gray-400'}`}
-                   >
-                     File MP3
-                   </button>
-                </div>
-                
-                <div className="space-y-4">
-                  {/* Ô nhập kịch bản: Luôn hiển thị để phục vụ AI giải thích */}
+                )}
+                {skill === 'speaking' && (
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
-                      {listeningMode === 'ai' ? "Kịch bản để AI đọc (AI Voice)" : "Kịch bản để AI giải thích (Transcript)"}
-                    </label>
-                    <textarea 
-                      rows="6" 
-                      className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-medium focus:ring-2 ring-indigo-500 transition-all" 
-                      placeholder="Dán nội dung bài nghe vào đây..." 
-                      value={scriptContent} 
-                      onChange={(e) => setScriptContent(e.target.value)} 
-                    />
-                  </div>
-
-                  {/* Khu vực tải file MP3: Chỉ hiện khi chọn chế độ MP3 */}
-                  {listeningMode === 'mp3' && (
-                    <div className="border-2 border-dashed border-gray-200 rounded-3xl p-6 text-center relative group hover:border-indigo-300 transition-colors">
-                      <input 
-                        type="file" 
-                        accept="audio/*" 
-                        onChange={handleAudioUpload} 
-                        className="absolute inset-0 opacity-0 cursor-pointer z-10" 
-                      />
-                      {audioUrl ? (
-                        <div className="text-green-600 font-bold flex flex-col items-center gap-2">
-                          <Check size={32}/> Đã tải file lên thành công
-                        </div>
-                      ) : (
-                        <div className="text-gray-400 flex flex-col items-center gap-2">
-                          <FileAudio size={32}/> Nhấn hoặc kéo thả file MP3
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 2. READING / WRITING / SPEAKING: Nội dung văn bản */}
-            {(skill === 'reading' || skill === 'writing' || skill === 'speaking') && (
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><FileText size={18}/> {getLabel()}</h3>
-                <textarea 
-                  rows="10"
-                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-serif leading-relaxed"
-                  placeholder={getPlaceholder()}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                ></textarea>
-              </div>
-            )}
-
-            {/* 3. CÂU HỎI TRẮC NGHIỆM: Chỉ cho Reading/Listening */}
-            {(skill === 'reading' || skill === 'listening') && (
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-gray-800 flex items-center gap-2"><FileSpreadsheet size={18}/> Danh sách câu hỏi</h3>
-                  <a href="/template.xlsx" className="text-xs text-indigo-600 hover:underline font-medium">Tải file mẫu</a>
-                </div>
-
-                {!questions.length ? (
-                  <div className="border-2 border-dashed border-indigo-200 bg-indigo-50/50 rounded-xl p-8 text-center relative group hover:bg-indigo-50 transition">
-                    <input type="file" accept=".xlsx, .xls" onChange={handleExcelUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                    <FileSpreadsheet className="w-10 h-10 text-indigo-400 mx-auto mb-3 group-hover:scale-110 transition"/>
-                    <p className="text-indigo-800 font-bold">Upload file Excel câu hỏi</p>
-                    <p className="text-indigo-500 text-xs mt-1">Hỗ trợ .xlsx, .xls</p>
-                  </div>
-                ) : (
-                  <div className="overflow-hidden border border-gray-200 rounded-xl">
-                    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex justify-between items-center">
-                      <span className="text-sm font-bold text-gray-600">Đã nhận {questions.length} câu hỏi</span>
-                      <button onClick={() => setQuestions([])} className="text-red-500 hover:bg-red-50 p-1.5 rounded"><X size={16}/></button>
-                    </div>
-                    <div className="max-h-64 overflow-y-auto">
-                      <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-100 text-gray-500 font-bold sticky top-0">
-                          <tr>
-                            <th className="p-3 w-10">#</th>
-                            <th className="p-3">Câu hỏi</th>
-                            <th className="p-3 w-20 text-center">Đ.Án</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {questions.map((q, i) => (
-                            <tr key={i} className="hover:bg-gray-50">
-                              <td className="p-3 text-gray-400">{i + 1}</td>
-                              <td className="p-3 font-medium text-gray-800 truncate max-w-xs" title={q.Question || q.question_text}>
-                                {q.Question || q.question_text}
-                              </td>
-                              <td className="p-3 font-bold text-green-600 text-center">{q.Correct || q.correct_answer}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <label className="text-xs font-bold text-slate-600 mb-1 block">Phần thi</label>
+                    <select value={part} onChange={(e) => setPart(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-sm outline-none font-medium">
+                      <option value="1">Part 1</option><option value="2">Part 2</option><option value="3">Part 3</option>
+                    </select>
                   </div>
                 )}
               </div>
-            )}
-
-            {/* 4. WRITING / SPEAKING NOTE */}
-            {(skill === 'writing' || skill === 'speaking') && (
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 flex items-start gap-3">
-                <AlertCircle className="text-blue-600 w-5 h-5 flex-shrink-0 mt-0.5"/>
-                <div>
-                  <p className="text-blue-800 font-bold text-sm">Lưu ý</p>
-                  <p className="text-blue-700 text-sm mt-1">
-                    Nhập đầy đủ thông tin cần thiết. Với Writing, hãy cung cấp đề bài chi tiết để học viên hiểu rõ yêu cầu. Với Speaking, nhập câu hỏi cụ thể cho từng phần thi.
-                  </p>
-                </div>
-              </div>
-            )}
-
+            </div>
           </div>
+
+          {/* Phân loại Chủ đề */}
+          <div className="border border-slate-200 rounded p-5 space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <Tag size={14}/> Phân loại chủ đề
+              </h3>
+              <button onClick={() => setIsAddingTopic(!isAddingTopic)} className="text-[10px] font-bold text-indigo-600 hover:underline uppercase">
+                {isAddingTopic ? "Hủy" : "+ Thêm mới"}
+              </button>
+            </div>
+
+            {isAddingTopic ? (
+              <div className="flex gap-2 animate-in slide-in-from-top-1">
+                <input 
+                  type="text" placeholder="Tên chủ đề..." 
+                  className="flex-1 p-2 bg-white border border-slate-300 rounded text-xs outline-none focus:border-indigo-500"
+                  value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)}
+                />
+                <button onClick={handleAddTopic} className="p-2 bg-slate-900 text-white rounded"><Check size={14}/></button>
+              </div>
+            ) : (
+              <select value={topicId} onChange={(e) => setTopicId(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-sm outline-none font-medium">
+                <option value="">-- Chọn chủ đề --</option>
+                {topics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            )}
+          </div>
+
+          {/* AI Assistant (Chỉ Reading) */}
+          {skill === 'reading' && (
+            <div className="bg-slate-900 rounded p-6 text-white space-y-4 shadow-md relative overflow-hidden">
+               <div className="absolute -bottom-4 -right-4 opacity-10"><Sparkles size={100}/></div>
+               <h3 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-indigo-400">
+                 <Bot size={16}/> AI Assistant
+               </h3>
+               <div className="space-y-4">
+                 <div>
+                   <label className="text-[10px] text-slate-400 font-bold uppercase block mb-2">Số lượng câu soạn: {questionCount}</label>
+                   <input type="range" min="1" max="10" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full accent-indigo-500" />
+                 </div>
+                 <button 
+                   onClick={handleAIGenerate} 
+                   disabled={isGenerating}
+                   className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-900/20"
+                 >
+                   {isGenerating ? <Loader2 className="animate-spin" size={14}/> : <Bot size={14}/>} 
+                   AI Tự động soạn câu hỏi
+                 </button>
+               </div>
+            </div>
+          )}
         </div>
-      </main>
+
+        {/* MAIN CONTENT (8/12) */}
+        <div className="lg:col-span-8 space-y-6">
+          
+          {/* Tiêu đề bài thi */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tiêu đề hiển thị</label>
+            <input 
+              type="text" 
+              className="w-full p-3 bg-white border border-slate-200 rounded text-lg font-bold outline-none focus:border-indigo-500 transition-all placeholder:text-slate-300"
+              placeholder={`VD: ${skill.toUpperCase()} Actual Test #01`}
+              value={title} onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+
+          {/* Nội dung chi tiết */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                {skill === 'listening' ? "Kịch bản/Transcript" : "Nội dung đề bài"}
+              </label>
+              {skill === 'listening' && (
+                <div className="flex bg-slate-100 p-0.5 rounded border border-slate-200">
+                  <button onClick={() => setListeningMode('ai')} className={`px-3 py-1 text-[10px] font-bold rounded ${listeningMode === 'ai' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>AI Voice</button>
+                  <button onClick={() => setListeningMode('mp3')} className={`px-3 py-1 text-[10px] font-bold rounded ${listeningMode === 'mp3' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>File MP3</button>
+                </div>
+              )}
+            </div>
+            
+            <textarea 
+              rows={skill === 'listening' ? 6 : 14}
+              className="w-full p-5 bg-slate-50/50 border border-slate-200 rounded outline-none focus:border-indigo-500 font-serif text-base leading-relaxed text-slate-700 shadow-inner"
+              placeholder={skill === 'listening' ? "Dán transcript bài nghe vào đây..." : "Nhập nội dung bài đọc hoặc mô tả đề bài viết/nói..."}
+              value={skill === 'listening' ? scriptContent : content}
+              onChange={(e) => skill === 'listening' ? setScriptContent(e.target.value) : setContent(e.target.value)}
+            />
+          </div>
+
+          {/* Listening: Audio Upload */}
+          {skill === 'listening' && listeningMode === 'mp3' && (
+            <div className="border border-dashed border-slate-200 bg-slate-50/50 p-10 rounded flex flex-col items-center justify-center relative group hover:border-blue-300 transition-all">
+              <input type="file" accept="audio/*" onChange={handleAudioUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+              {audioUrl ? (
+                <div className="text-blue-600 flex flex-col items-center gap-2">
+                  <CheckCircle2 size={40} />
+                  <span className="text-sm font-bold">Audio đã tải lên thành công</span>
+                </div>
+              ) : (
+                <div className="text-slate-400 flex flex-col items-center gap-2 opacity-60 group-hover:opacity-100 transition-all">
+                  <FileAudio size={48} strokeWidth={1.2} />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">Click hoặc Kéo thả file MP3</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Danh sách câu hỏi (Excel) */}
+          {(skill === 'reading' || skill === 'listening') && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                  <ListChecks size={14}/> Danh sách câu hỏi trắc nghiệm
+                </h3>
+                <a href="/template.xlsx" className="text-[10px] font-bold text-indigo-600 hover:underline">Tải File Excel Mẫu</a>
+              </div>
+
+              {!questions.length ? (
+                <div className="border border-dashed border-slate-200 p-12 rounded flex flex-col items-center justify-center relative group hover:bg-slate-50/50 transition-all">
+                  <input type="file" accept=".xlsx, .xls" onChange={handleExcelUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                  <FileSpreadsheet className="text-slate-300 group-hover:text-indigo-400 transition-all mb-4" size={56} strokeWidth={1} />
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tải lên danh sách câu hỏi (.xlsx)</p>
+                </div>
+              ) : (
+                <div className="border border-slate-200 rounded overflow-hidden shadow-sm">
+                   <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                      <span>Preview: {questions.length} câu hỏi được nhận diện</span>
+                      <button onClick={() => setQuestions([])} className="text-rose-500 hover:bg-rose-50 p-1 rounded transition-colors"><X size={16}/></button>
+                   </div>
+                   <div className="max-h-64 overflow-y-auto">
+                     <table className="w-full text-xs text-left border-collapse">
+                        <thead className="bg-slate-50 sticky top-0">
+                            <tr className="text-slate-400 font-bold border-b border-slate-100">
+                                <th className="p-3 w-10">#</th>
+                                <th className="p-3">Câu hỏi</th>
+                                <th className="p-3 w-16 text-center">Đáp án</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {questions.map((q, i) => (
+                            <tr key={i} className="hover:bg-slate-50 transition-colors">
+                              <td className="p-3 w-8 text-slate-300 font-mono">#{i+1}</td>
+                              <td className="p-3 font-medium text-slate-700">{q.Question || q.question_text}</td>
+                              <td className="p-3 w-12 text-center">
+                                <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-black border border-emerald-100">{q.Correct || q.correct_answer}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                     </table>
+                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Info Banner for Subjective Skills */}
+          {(skill === 'writing' || skill === 'speaking') && (
+            <div className="p-5 bg-slate-50 border border-slate-200 flex items-start gap-3 rounded">
+              <AlertCircle size={18} className="text-slate-900 mt-0.5" />
+              <div>
+                <p className="text-xs text-slate-900 font-bold uppercase tracking-wider mb-1">Hướng dẫn soạn đề {skill.toUpperCase()}</p>
+                <p className="text-xs text-slate-500 leading-relaxed italic">
+                    Đối với các kỹ năng tự luận, hãy cung cấp yêu cầu đề bài chi tiết nhất có thể. Trợ lý Chinhlu sẽ dựa vào nội dung này để đưa ra các tiêu chí chấm điểm và phản hồi (Feedback) cho học viên sau khi nộp bài.
+                </p>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
     </div>
   );
 };

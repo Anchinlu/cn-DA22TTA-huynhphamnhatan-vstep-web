@@ -59,6 +59,13 @@ const ExamSimulation = () => {
         if (!res.ok) throw new Error("Lỗi tải đề");
         const data = await res.json();
         setExamData(data);
+        if (data.listening?.audio_url) {
+        audioRef.current = new Audio(data.listening.audio_url);
+        audioRef.current.onended = () => {
+          setListeningStatus('finished');
+          setIsSpeaking(false);
+        };
+      }
       } catch (err) {
         toast.error("Lỗi tải đề thi");
         navigate('/practice');
@@ -125,7 +132,7 @@ const ExamSimulation = () => {
         u.pitch = 0.9;
         u.rate = 0.9;
     } else {
-        u.voice = femaleVoice; // Narrator cũng dùng giọng nữ theo yêu cầu cải tiến
+        u.voice = femaleVoice; 
         u.rate = 0.95;
     }
 
@@ -141,11 +148,15 @@ const ExamSimulation = () => {
     synthRef.current.speak(u);
   };
 
-  // 2. LISTENING INTRO AI - ĐÃ CẢI TIẾN: TỰ ĐỘNG NGẮT KHI CHUYỂN SKILL
+  
   useEffect(() => {
-      // Nếu không còn ở Listening, tắt giọng AI ngay lập tức
+    
       if (currentSkill !== 'listening') {
           window.speechSynthesis.cancel();
+          if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
           return;
       }
 
@@ -157,7 +168,7 @@ const ExamSimulation = () => {
           const introText = "This is the listening test. You will have 30 seconds to preview the questions before the audio starts. Please listen carefully.";
           
           const startPrep = () => {
-            if (currentSkill === 'listening') { // Kiểm tra lần nữa trước khi chuyển trạng thái
+            if (currentSkill === 'listening') { 
                 setListeningStatus('prep');
                 setIsTimerRunning(true);
                 toast("Bắt đầu 30s đọc trước câu hỏi!", { icon: '👀' });
@@ -227,127 +238,133 @@ const ExamSimulation = () => {
       return { isComplete: true };
   };
 
-  const executeSubmit = async () => {
-      setIsTimerRunning(false);
-      window.speechSynthesis.cancel(); // Tắt AI khi nộp bài
-      
-      const token = localStorage.getItem('vstep_token');
-      if (!token) {
-          toast.error("Vui lòng đăng nhập để lưu kết quả!");
-          navigate('/dang-nhap');
-          return;
+const executeSubmit = async () => {
+  setIsTimerRunning(false);
+  window.speechSynthesis.cancel(); 
+  
+  const token = localStorage.getItem('vstep_token');
+  if (!token) {
+    toast.error("Vui lòng đăng nhập để lưu kết quả!");
+    navigate('/dang-nhap');
+    return;
+  }
+
+  const toastId = toast.loading("Trợ lí AI đang tổng hợp và chấm điểm...");
+
+  try {
+    // --- 1. TÍNH ĐIỂM TRẮC NGHIỆM (Làm tròn 1 chữ số) ---
+    let lCorrect = 0;
+    const lQs = examData.listening?.questions || [];
+    lQs.forEach(q => { 
+      const userAns = (answers.listening[q.id] || "").toLowerCase();
+      const correctAns = (q.correct_answer || q.correct || "").toLowerCase();
+      if (userAns === correctAns && userAns !== "") lCorrect++; 
+    });
+    // Sử dụng .toFixed(1) để điểm không bị lẻ như 2.2222
+    const listening_score = lQs.length > 0 ? parseFloat(((lCorrect / lQs.length) * 10).toFixed(1)) : 0;
+
+    let rCorrect = 0, rTotal = 0;
+    examData.reading?.forEach(p => p.questions?.forEach(q => {
+      rTotal++;
+      const userAns = (answers.reading[q.id] || "").toLowerCase();
+      const correctAns = (q.correct_answer || q.correct || "").toLowerCase();
+      if (userAns === correctAns && userAns !== "") rCorrect++;
+    }));
+    const reading_score = rTotal > 0 ? parseFloat(((rCorrect / rTotal) * 10).toFixed(1)) : 0;
+
+    // --- 2. CHẤM ĐIỂM WRITING (Khớp với feedback của Backend) ---
+    let writing_score = 0;
+    let writing_feedback = ""; 
+    if (examData.writing && examData.writing.length > 0) {
+      let totalW = 0;
+      for (const task of examData.writing) {
+        const text = (answers.writing[task.id] || "").toString().trim();
+        
+        // Check nếu bỏ trống
+        if (text.length < 10) {
+          writing_feedback += `\n- ${task.title}: Bạn đã bỏ trống phần này, có vấn đề gì sao?`;
+          continue;
+        }
+
+        const res = await fetch('http://localhost:5000/api/ai/grade-writing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: task.question_text, studentAnswer: text })
+        });
+        
+        if (res.ok) {
+          const grade = await res.json();
+          totalW += parseFloat(grade.score || 0);
+          // 🔥 SỬA TẠI ĐÂY: Dùng grade.feedback thay vì explanation
+          writing_feedback += `\n- ${task.title}: ${grade.feedback || "AI đã ghi nhận bài làm."}`;
+        }
       }
+      writing_score = parseFloat((totalW / examData.writing.length).toFixed(1));
+    }
 
-    const toastId = toast.loading("Trợ lí AI đang chấm bài, vui lòng đợi...");
+    // --- 3. CHẤM ĐIỂM SPEAKING ---
+    let speaking_score = 0;
+    let speaking_feedback = ""; 
+    if (examData.speaking && examData.speaking.length > 0) {
+      let totalS = 0;
+      for (const part of examData.speaking) {
+        const resp = answers.speaking[part.id];
+        
+        // Check nếu chưa ghi âm
+        if (!resp || resp === 'Chưa ghi âm' || resp === 'audio.mp3') {
+          speaking_feedback += `\n- ${part.title}: Bạn đã bỏ trống phần này, có vấn đề gì sao?`;
+          continue;
+        }
 
-      try {
-          let lCorrect = 0;
-          const lQs = examData.listening?.questions || [];
-          lQs.forEach(q => { 
-              const userAns = (answers.listening[q.id] || "").toLowerCase();
-              const correctAns = (q.correct_answer || q.correct || "").toLowerCase();
-              if (userAns === correctAns && userAns !== "") lCorrect++; 
-          });
-          const listening_score = lQs.length > 0 ? (lCorrect / lQs.length) * 10 : 0;
+        const res = await fetch('http://localhost:5000/api/ai/grade-speaking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: part.question_text, studentResponse: resp })
+        });
 
-          let rCorrect = 0, rTotal = 0;
-          examData.reading?.forEach(p => p.questions?.forEach(q => {
-              rTotal++;
-              const userAns = (answers.reading[q.id] || "").toLowerCase();
-              const correctAns = (q.correct_answer || q.correct || "").toLowerCase();
-              if (userAns === correctAns && userAns !== "") rCorrect++;
-          }));
-          const reading_score = rTotal > 0 ? (rCorrect / rTotal) * 10 : 0;
-
-          let writing_score = 0;
-          if (examData.writing && examData.writing.length > 0) {
-              let totalW = 0;
-              for (const task of examData.writing) {
-                  const text = (answers.writing[task.id] || "").toString().trim();
-                  if (!text || text.length < 10) {
-                      // Nếu bỏ trống hoặc quá ngắn, bỏ qua gọi Trợ lí AI và cho 0 điểm
-                      toast("Bài viết trống hoặc quá ngắn — chấm 0 điểm (Trợ lí AI bỏ qua)");
-                      totalW += 0;
-                      continue;
-                  }
-
-                  const res = await fetch('http://localhost:5000/api/ai/grade-writing', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ 
-                          question: task.question_text, 
-                          studentAnswer: text
-                      })
-                  });
-                  if (!res.ok) {
-                      console.error('Lỗi Trợ lí AI grade-writing:', res.status);
-                      totalW += 0;
-                      continue;
-                  }
-                  const grade = await res.json();
-                  totalW += parseFloat(grade.score || 0);
-              }
-              writing_score = totalW / examData.writing.length;
-          }
-
-          let speaking_score = 0;
-          if (examData.speaking && examData.speaking.length > 0) {
-              let totalS = 0;
-              for (const part of examData.speaking) {
-                  const resp = answers.speaking[part.id];
-                  // Nếu chưa ghi âm (null/undefined) thì cho 0
-                  if (!resp || resp === 'Chưa ghi âm') {
-                      toast("Phần nói chưa có ghi âm — chấm 0 điểm (Trợ lí AI bỏ qua)");
-                      totalS += 0;
-                      continue;
-                  }
-
-                  const res = await fetch('http://localhost:5000/api/ai/grade-speaking', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ 
-                          question: part.question_text, 
-                          studentResponse: resp
-                      })
-                  });
-                  if (!res.ok) {
-                      console.error('Lỗi Trợ lí AI grade-speaking:', res.status);
-                      totalS += 0;
-                      continue;
-                  }
-                  const grade = await res.json();
-                  totalS += parseFloat(grade.score || 0);
-              }
-              speaking_score = totalS / examData.speaking.length;
-          }
-
-          const overall_score = Math.round(((listening_score + reading_score + writing_score + speaking_score) / 4) * 10) / 10;
-
-          const resSubmit = await fetch('http://localhost:5000/api/mock-tests/submit', {
-              method: 'POST',
-              headers: { 
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}` 
-              },
-              body: JSON.stringify({
-                  listening_score, reading_score, writing_score, speaking_score, overall_score,
-                  chi_tiet_bai_lam: answers 
-              })
-          });
-
-          if (!resSubmit.ok) throw new Error("Lỗi hệ thống khi lưu điểm");
-          
-          toast.success("Nộp bài thành công!", { id: toastId });
-          navigate('/profile'); 
-
-      } catch (err) {
-          console.error("Lỗi nộp bài:", err);
-          toast.error("Lỗi: " + err.message, { id: toastId });
+        if (res.ok) {
+          const grade = await res.json();
+          totalS += parseFloat(grade.score || 0);
+          // Backend speaking hiện tại chỉ trả về score, nên ta thêm text mặc định cho feedback
+          speaking_feedback += `\n- ${part.title}: ${grade.feedback || "AI đã phân tích bài nói của bạn."}`;
+        }
       }
-  };
+      speaking_score = parseFloat((totalS / examData.speaking.length).toFixed(1));
+    }
+
+    // --- 4. TÍNH ĐIỂM TỔNG KẾT ---
+    const overall_score = parseFloat(((listening_score + reading_score + writing_score + speaking_score) / 4).toFixed(1));
+
+    // --- 5. GỬI DỮ LIỆU ---
+    const resSubmit = await fetch('http://localhost:5000/api/mock-tests/submit', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify({
+        test_id: id,
+        listening_score, reading_score, writing_score, speaking_score, overall_score,
+        writing_feedback: writing_feedback.trim(), 
+        speaking_feedback: speaking_feedback.trim(),
+        chi_tiet_bai_lam: answers 
+      })
+    });
+
+    const responseData = await resSubmit.json();
+    if (!resSubmit.ok) throw new Error(responseData.message || "Lỗi lưu điểm");
+    
+    toast.success("Hoàn thành bài thi thử!", { id: toastId });
+    navigate(`/mock-test/result/${responseData.id}`); 
+
+  } catch (err) {
+    console.error("Lỗi nộp bài:", err);
+    toast.error("Lỗi: " + err.message, { id: toastId });
+  }
+};
 
   const executeNextSkill = () => {
-    window.speechSynthesis.cancel(); // QUAN TRỌNG: Tắt giọng Trợ lí AI ngay khi bấm nút
+    window.speechSynthesis.cancel(); 
       if (currentSkillIndex < 3) {
           setCurrentSkillIndex(prev => prev + 1);
           window.scrollTo(0, 0);
@@ -358,7 +375,7 @@ const ExamSimulation = () => {
   };
 
   const executeExit = () => {
-    window.speechSynthesis.cancel(); // Tắt Trợ lí AI khi thoát
+    window.speechSynthesis.cancel(); 
       navigate('/practice');
   };
 

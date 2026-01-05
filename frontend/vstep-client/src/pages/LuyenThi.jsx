@@ -160,7 +160,7 @@ const LuyenThi = () => {
             </p>
           </div>
 
-          {/* Filter Tabs (Giữ nguyên) */}
+          {/* Filter Tabs 
           <div className="flex justify-center mb-12 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
             <div className="inline-flex bg-white p-1 rounded-xl shadow-sm border border-gray-200">
               {['all', 'B1', 'B2', 'C1'].map((tab) => (
@@ -177,7 +177,7 @@ const LuyenThi = () => {
                 </button>
               ))}
             </div>
-          </div>
+          </div> */}
 
           {/* Section 1: Kỹ năng chuyên sâu */}
           <div className="mb-16">

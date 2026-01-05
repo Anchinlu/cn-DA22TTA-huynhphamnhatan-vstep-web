@@ -113,18 +113,25 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Nộp bài và lưu kết quả thi thử (student hoặc teacher)
 router.post("/submit", verifyToken, async (req, res) => {
   try {
-    const { listening_score, reading_score, writing_score, speaking_score, overall_score, chi_tiet_bai_lam } = req.body;
+    const { 
+      listening_score, 
+      reading_score, 
+      writing_score, 
+      speaking_score, 
+      overall_score, 
+      chi_tiet_bai_lam,
+      writing_feedback, 
+      speaking_feedback  
+    } = req.body;
 
     const sql = `
       INSERT INTO ket_qua_thi_thu 
-      (user_id, listening_score, reading_score, writing_score, speaking_score, overall_score, chi_tiet_bai_lam, ngay_thi) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+      (user_id, listening_score, reading_score, writing_score, speaking_score, overall_score, chi_tiet_bai_lam, writing_feedback, speaking_feedback, ngay_thi) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `;
-
-    await pool.query(sql, [
+    const [result] = await pool.query(sql, [
       req.user.userId,
       listening_score,
       reading_score,
@@ -132,11 +139,17 @@ router.post("/submit", verifyToken, async (req, res) => {
       speaking_score,
       overall_score,
       JSON.stringify(chi_tiet_bai_lam),
+      writing_feedback || '', 
+      speaking_feedback || ''  
     ]);
+    res.status(201).json({ 
+      message: "Đã lưu kết quả thi thử!", 
+      id: result.insertId 
+    });
 
-    res.status(201).json({ message: "Đã lưu kết quả thi thử!" });
   } catch (err) {
-    res.status(500).json({ message: "Lỗi lưu kết quả thi." });
+    console.error("Lỗi lưu kết quả:", err);
+    res.status(500).json({ message: "Lỗi lưu kết quả thi: " + err.message });
   }
 });
 

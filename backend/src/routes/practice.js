@@ -280,6 +280,59 @@ router.get("/speaking/history", async (req, res) => {
   }
 });
 
+router.get("/mock-test/result/:id", async (req, res) => {
+  try {
+    // 1. Kiểm tra Token
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: "Bạn cần đăng nhập để xem kết quả" });
+    
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const resultId = req.params.id;
+
+    // 2. Truy vấn dữ liệu (Dùng bảng nguoi_dung và user_id như DB thực tế của bạn)
+    const sql = `
+      SELECT 
+        kq.*, 
+        u.ho_ten,
+        mt.title as test_title
+      FROM ket_qua_thi_thu kq
+      LEFT JOIN nguoi_dung u ON kq.user_id = u.user_id
+      LEFT JOIN mock_tests mt ON kq.test_id = mt.id
+      WHERE kq.id = ? AND kq.user_id = ?
+    `;
+    
+    const [rows] = await pool.query(sql, [resultId, decoded.userId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Không tìm thấy kết quả bài thi này." });
+    }
+
+    // 3. Định dạng lại ngày tháng trước khi trả về cho Frontend
+    const result = rows[0];
+    const formattedResult = {
+      ...result,
+      // Chuyển đổi created_at hoặc ngay_thi sang định dạng tiếng Việt
+      ngay_thi_format: new Date(result.ngay_thi).toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    };
+
+    // 4. Trả về dữ liệu duy nhất một lần
+    res.status(200).json(formattedResult);
+
+  } catch (err) {
+    console.error("❌ Lỗi lấy kết quả thi thử:", err);
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: "Phiên đăng nhập hết hạn" });
+    }
+    res.status(500).json({ message: "Lỗi server khi truy xuất kết quả: " + err.message });
+  }
+});
+
 // Slideshow
 router.get("/slideshow", async (req, res) => {
   try {
@@ -289,5 +342,4 @@ router.get("/slideshow", async (req, res) => {
     res.status(500).json({ message: "Lỗi server" });
   }
 });
-
 export default router;

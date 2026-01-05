@@ -61,9 +61,11 @@ const Header = () => {
           
           {/* LOGO */}
           <div className="flex flex-shrink-0 items-center cursor-pointer" onClick={() => navigate('/')}>
-            <div className="bg-blue-600 p-1.5 rounded-lg mr-2 shadow-md shadow-blue-200">
-               <BookOpen className="h-6 w-6 text-white" />
-            </div>
+           <img
+            src={process.env.PUBLIC_URL + '/favicon.ico'}
+            alt="VSTEP Pro Logo"
+            className="h-14 w-auto object-contain mr-4 rounded-xl shadow"
+          />
             <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500 hidden sm:block">
               VSTEP Pro
             </span>

@@ -135,25 +135,16 @@ router.post("/ai/explain", async (req, res) => {
     const { question, options, correct, userAnswer, context } = req.body;
 
     const prompt = `
-      Bạn là một giáo viên chuyên luyện thi VSTEP. Hãy giải thích câu hỏi sau đây một cách chuyên nghiệp.
-      
-      --- DỮ LIỆU ĐẦU VÀO ---
-      - Bài nghe/đọc (Context): "${context || 'Không có bản kịch bản (transcript) đi kèm.'}"
+      Bạn là giáo viên VSTEP. Dựa vào nội dung bài đọc dưới đây để giải thích câu hỏi:
+      --- CONTEXT ---
+      "${context || 'Không có bài đọc'}"
+      ---------------
+      Giải thích câu hỏi này cho người Việt:
       - Câu hỏi: "${question}"
+      - Các lựa chọn: ${JSON.stringify(options)}
       - Đáp án đúng: ${correct}
       
-      --- NHIỆM VỤ ---
-      1. Dịch câu hỏi và các lựa chọn sang tiếng Việt.
-      2. Giải thích tại sao chọn đáp án ${correct}. 
-         - Nếu có 'Context', hãy trích dẫn câu văn chứa đáp án.
-         - Nếu không có 'Context', hãy giải thích dựa trên kiến thức từ vựng/ngữ pháp/logic của câu hỏi.
-      
-      Trả về JSON duy nhất: 
-      { 
-        "translation": "bản dịch tiếng Việt", 
-        "explanation": "lời giải thích chi tiết", 
-        "key_vocabulary": ["từ mới: nghĩa"] 
-      }
+      Trả về JSON: { "translation": "Dịch câu hỏi/đáp án", "explanation": "Giải thích chi tiết dựa trên bài đọc", "key_vocabulary": ["từ vựng: nghĩa"] }
     `;
 
     const result = await callGemini(prompt);
