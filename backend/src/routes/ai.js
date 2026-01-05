@@ -3,6 +3,36 @@ import { callGemini } from "../utils/aiHelper.js";
 
 const router = express.Router();
 
+// Helper: Generate improved prompt for question generation
+const generatePrompt = (content, type, level, count) => {
+  return `
+  Bạn là chuyên gia khảo thí VSTEP.
+  Nhiệm vụ: Tạo ${count} câu hỏi trắc nghiệm trình độ ${level} cho nội dung sau: "${content}".
+
+  QUY TẮC QUAN TRỌNG:
+  1. Nếu nội dung quá ngắn hoặc không đủ dữ kiện để tạo đủ ${count} câu hỏi chất lượng ở trình độ ${level}, hãy trả về JSON: {"error": "insufficient_content", "max_possible": <số câu tối đa có thể tạo>}.
+  2. Mỗi câu hỏi phải có tính suy luận, không chỉ là copy-paste từ văn bản.
+  3. Trả về JSON mảng "questions" nếu thành công. Mỗi phần tử cần có: {"question": "...", "options": ["A...","B...","C...","D..."], "answer": "A|B|C|D"}
+  4. TRẢ VỀ DUY NHẤT JSON VÀ KHÔNG GỘP THÊM BẤT KỲ CHỮ NÀO KHÁC.
+  `;
+};
+
+// Helper: Try to parse JSON safely (AI may return raw string)
+const safeParseJSON = (input) => {
+  if (!input) return null;
+  if (typeof input === 'object') return input;
+  try {
+    return JSON.parse(input);
+  } catch (e) {
+    // Try to extract JSON substring
+    const m = input.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    if (m) {
+      try { return JSON.parse(m[0]); } catch (ee) { return null; }
+    }
+    return null;
+  }
+};
+
 // AI: Grade Writing
 router.post("/ai/grade-writing", async (req, res) => {
   try {
@@ -105,22 +135,67 @@ router.post("/ai/explain", async (req, res) => {
     const { question, options, correct, userAnswer, context } = req.body;
 
     const prompt = `
-      Bạn là giáo viên VSTEP. Dựa vào nội dung bài đọc dưới đây để giải thích câu hỏi:
-      --- CONTEXT ---
-      "${context || 'Không có bài đọc'}"
-      ---------------
-      Giải thích câu hỏi này cho người Việt:
+      Bạn là một giáo viên chuyên luyện thi VSTEP. Hãy giải thích câu hỏi sau đây một cách chuyên nghiệp.
+      
+      --- DỮ LIỆU ĐẦU VÀO ---
+      - Bài nghe/đọc (Context): "${context || 'Không có bản kịch bản (transcript) đi kèm.'}"
       - Câu hỏi: "${question}"
-      - Các lựa chọn: ${JSON.stringify(options)}
       - Đáp án đúng: ${correct}
       
-      Trả về JSON: { "translation": "Dịch câu hỏi/đáp án", "explanation": "Giải thích chi tiết dựa trên bài đọc", "key_vocabulary": ["từ vựng: nghĩa"] }
+      --- NHIỆM VỤ ---
+      1. Dịch câu hỏi và các lựa chọn sang tiếng Việt.
+      2. Giải thích tại sao chọn đáp án ${correct}. 
+         - Nếu có 'Context', hãy trích dẫn câu văn chứa đáp án.
+         - Nếu không có 'Context', hãy giải thích dựa trên kiến thức từ vựng/ngữ pháp/logic của câu hỏi.
+      
+      Trả về JSON duy nhất: 
+      { 
+        "translation": "bản dịch tiếng Việt", 
+        "explanation": "lời giải thích chi tiết", 
+        "key_vocabulary": ["từ mới: nghĩa"] 
+      }
     `;
 
     const result = await callGemini(prompt);
     res.status(200).json(result);
   } catch (err) {
     res.status(500).json({ message: "Lỗi AI Explain." });
+  }
+});
+
+// API: Generate Questions (improved prompt + insufficient_content handling)
+router.post("/ai/generate-questions", async (req, res) => {
+  try {
+    const { content, type, level, count } = req.body;
+    if (!content || content.toString().trim().length < 10) {
+      return res.status(422).json({ message: "Nội dung quá ngắn để tạo câu hỏi.", suggestion: 0 });
+    }
+
+    const prompt = generatePrompt(content, type, level, count);
+    const raw = await callGemini(prompt);
+
+    // AI may return string or object
+    const parsed = safeParseJSON(raw);
+    if (!parsed) {
+      // If parsing failed, try to return raw as message
+      return res.status(500).json({ message: "Không thể phân tích phản hồi AI.", raw });
+    }
+
+    if (parsed.error === "insufficient_content") {
+      return res.status(422).json({
+        message: `Nội dung quá ngắn để tạo ${count} câu trình độ ${level}. AI gợi ý chỉ nên tạo tối đa ${parsed.max_possible} câu.`,
+        suggestion: parsed.max_possible
+      });
+    }
+
+    if (Array.isArray(parsed.questions)) {
+      return res.status(200).json({ questions: parsed.questions });
+    }
+
+    return res.status(500).json({ message: "AI trả về định dạng không hợp lệ", parsed });
+  } catch (err) {
+    console.error('AI generate error:', err.message || err);
+    res.status(500).json({ message: "Lỗi xử lý AI" });
   }
 });
 

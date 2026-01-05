@@ -42,6 +42,7 @@ const ListeningPractice = () => {
   // Refs quản lý Audio
   const synthRef = useRef(window.speechSynthesis);
   const utteranceRef = useRef(null);
+  const audioRef = useRef(null);
   
   // [QUAN TRỌNG] Ref để theo dõi trạng thái Play/Pause tức thì
   const isPlayingRef = useRef(false); 
@@ -74,6 +75,10 @@ const ListeningPractice = () => {
       isCancelledRef.current = true;
       isPlayingRef.current = false;
       synthRef.current.cancel();
+      if (audioRef.current) {
+          try { audioRef.current.pause(); } catch (e) {}
+          audioRef.current = null;
+      }
     };
   }, []);
 
@@ -137,13 +142,11 @@ const ListeningPractice = () => {
 
     // Sự kiện khi đọc xong câu hiện tại
     u.onend = () => {
-        // [QUAN TRỌNG] Kiểm tra lại Ref trước khi đọc câu tiếp theo
         if (!isCancelledRef.current && isPlayingRef.current) { 
-             setTimeout(() => playDialogue(scriptArray, index + 1), 200); // Nghỉ 200ms giữa các câu
+             setTimeout(() => playDialogue(scriptArray, index + 1), 200); 
         }
     };
 
-    // [FIX LỖI CHROME] Gán biến vào window để tránh Garbage Collection dọn mất
     window.currentUtterance = u;
     
     utteranceRef.current = u;
@@ -155,10 +158,16 @@ const ListeningPractice = () => {
     if (!testData) return;
     synthRef.current.cancel();
     isCancelledRef.current = false;
-    isPlayingRef.current = true; // Đánh dấu đang active
+    isPlayingRef.current = true;
 
     const displayTopic = topic ? topic.replace('_', ' ') : 'General'; 
-    const introText = `Welcome to VSTEP Listening. Level ${level}. Topic: ${displayTopic}. You have ${PREP_TIME} seconds to look at the questions.`;
+    const introText = `In this part, you will hear eight short announcements or instructions.
+  There is one question for each announcement or instruction.
+  For each question, choose the right answer A, B, C, or D.
+  Then on the answer sheet, find the number of the question and fill in the space that corresponds to the letter of the answer you have chosen.
+
+  We are ready to start.
+  First, you have some time to look at questions 1 to 8.`;
     
     const u = new SpeechSynthesisUtterance(introText);
     u.lang = 'en-US';
@@ -171,49 +180,64 @@ const ListeningPractice = () => {
 
   // 2. Bắt đầu bài nghe chính
   const startMainSpeaking = useCallback(() => {
-    if (!testData?.script_content) return;
-    synthRef.current.cancel();
-    
-    // Cập nhật các cờ trạng thái
-    isCancelledRef.current = false;
-    isPlayingRef.current = true; 
-    setIsSpeaking(true);
+    // 1. Trường hợp có file MP3 
+    if (testData?.audio_url) {
+        if (!audioRef.current) {
+            audioRef.current = new Audio(testData.audio_url);
+            audioRef.current.onended = () => {
+                setIsSpeaking(false);
+                isPlayingRef.current = false;
+                setHasAudioEnded(true);
+                toast("Bài nghe đã kết thúc!", { icon: '🔔' });
+            };
+        }
+        try { audioRef.current.play(); } catch (e) {}
+        setIsSpeaking(true);
+        isPlayingRef.current = true;
+        return;
+    }
 
-    const dialogueScript = parseScript(testData.script_content);
-    playDialogue(dialogueScript, 0);
-
+    if (testData?.script_content) {
+        synthRef.current.cancel();
+        isCancelledRef.current = false;
+        isPlayingRef.current = true; 
+        setIsSpeaking(true);
+        const dialogueScript = parseScript(testData.script_content);
+        playDialogue(dialogueScript, 0);
+    }
   }, [testData, isSubmitted]);
 
   // 3. Nút Play/Pause
-  const togglePlay = () => {
+    const togglePlay = () => {
     if (!isSubmitted) {
-        // ĐANG THI
-        if (hasAudioEnded) {
-            toast.error("Chỉ được nghe 1 lần!", { icon: '🔒' });
-            return;
-        }
-        if (isSpeaking) {
-            toast("Không thể dừng khi đang thi!", { icon: '🚫' });
-            return; 
-        }
-        startMainSpeaking();
+      if (hasAudioEnded) {
+        toast.error("Chỉ được nghe 1 lần!", { icon: '🔒' });
+        return;
+      }
+      if (isSpeaking) {
+        toast("Không thể dừng khi đang thi!", { icon: '🚫' });
+        return; 
+      }
+      startMainSpeaking();
     } else {
-        // XEM LẠI (REVIEW MODE)
-        if (synthRef.current.speaking) {
-            if (synthRef.current.paused) {
-                synthRef.current.resume();
-                setIsSpeaking(true);
-                isPlayingRef.current = true;
-            } else {
-                synthRef.current.pause();
-                setIsSpeaking(false);
-                isPlayingRef.current = false; // Tạm dừng logic đệ quy
-            }
+      // XEM LẠI 
+      if (testData?.audio_url && audioRef.current) {
+        if (audioRef.current.paused) {
+          audioRef.current.play();
+          setIsSpeaking(true);
         } else {
-            startMainSpeaking();
+          audioRef.current.pause();
+          setIsSpeaking(false);
         }
+      } else {
+      
+        if (synthRef.current.speaking) {
+          if (synthRef.current.paused) { synthRef.current.resume(); setIsSpeaking(true); }
+          else { synthRef.current.pause(); setIsSpeaking(false); }
+        } else { startMainSpeaking(); }
+      }
     }
-  };
+    };
 
   // --- FLOW CONTROL ---
   const handleStart = () => {
@@ -263,11 +287,18 @@ const ListeningPractice = () => {
         setIsSubmitted(true);
         setShowResult(true);
         
-        // Stop Audio hoàn toàn
+        // 1. Dừng bộ đọc
         isCancelledRef.current = true; 
         isPlayingRef.current = false;
         synthRef.current.cancel();
         
+        // 2. Dừng file MP3 
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0; // Đưa thời gian về 0
+        }
+        
+        // 3. Cập nhật lại các trạng thái hiển thị
         setIsSpeaking(false);
         setIsIntroSpeaking(false);
         setHasAudioEnded(false); 
@@ -348,7 +379,7 @@ const ListeningPractice = () => {
       });
       const json = await res.json();
       setAiExplanations(prev => ({ ...prev, [qId]: json }));
-    } catch (err) { toast.error("Lỗi Trợ lí Chinhlu"); } 
+    } catch (err) { toast.error("Lỗi Trợ lí AI"); } 
     finally { setExplainingId(null); }
   };
 
@@ -545,7 +576,7 @@ const ListeningPractice = () => {
                       <div className="mt-6 ml-11 pt-4 border-t border-dashed border-gray-200">
                         {aiExplanations[q.id] ? (
                           <div className="bg-indigo-50 rounded-xl p-5 border border-indigo-100 animate-fade-in">
-                            <div className="flex items-center gap-2 mb-3 text-indigo-700 font-bold text-sm uppercase"><Sparkles className="w-4 h-4" /> Trợ lí Chinhlu giải thích</div>
+                            <div className="flex items-center gap-2 mb-3 text-indigo-700 font-bold text-sm uppercase"><Sparkles className="w-4 h-4" /> Trợ lí AI giải thích</div>
                             <div className="space-y-3">
                                 <div><span className="text-xs font-bold text-gray-500 uppercase flex gap-1 mb-1"><Globe size={12}/> Dịch</span><p className="text-gray-800 italic text-sm break-words whitespace-pre-wrap">{typeof aiExplanations[q.id].translation === 'string' ? aiExplanations[q.id].translation : "..."}</p></div>
                                 <div><span className="text-xs font-bold text-gray-500 uppercase flex gap-1 mb-1"><Lightbulb size={12}/> Giải thích</span><p className="text-gray-800 text-sm break-words whitespace-pre-wrap">{typeof aiExplanations[q.id].explanation === 'string' ? aiExplanations[q.id].explanation : "..."}</p></div>
@@ -554,7 +585,7 @@ const ListeningPractice = () => {
                         ) : (
                           <button onClick={() => handleAiExplain(q.id, q)} disabled={explainingId === q.id} className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg transition-all">
                             {explainingId === q.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                            {explainingId === q.id ? "Đang suy nghĩ..." : "Giải thích bằng Trợ lí Chinhlu"}
+                            {explainingId === q.id ? "Đang suy nghĩ..." : "Giải thích bằng Trợ lí AI"}
                           </button>
                         )}
                       </div>

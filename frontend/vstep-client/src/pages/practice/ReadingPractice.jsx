@@ -222,7 +222,7 @@ const ReadingPractice = () => {
       const data = await res.json();
       setAiExplanations(prev => ({ ...prev, [questionId]: data }));
     } catch (err) { 
-        toast.error("Lỗi Trợ lí Chinhlu: " + err.message);
+        toast.error("Lỗi Trợ lí AI: " + err.message);
     } finally { setExplainingId(null); }
   };
 
@@ -456,7 +456,7 @@ const ReadingPractice = () => {
                       <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl border border-indigo-100 shadow-sm overflow-hidden animate-fade-in">
                         <div className="bg-indigo-100/50 px-5 py-3 border-b border-indigo-100 flex items-center gap-2">
                            <Sparkles className="w-4 h-4 text-indigo-600" />
-                           <h4 className="font-bold text-indigo-900 text-xs uppercase tracking-wide">Trợ lí Chinhlu giải thích</h4>
+                           <h4 className="font-bold text-indigo-900 text-xs uppercase tracking-wide">Trợ lí AI giải thích</h4>
                         </div>
                         <div className="p-5 space-y-4">
                            <div>
@@ -487,7 +487,7 @@ const ReadingPractice = () => {
                         className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-4 py-2 rounded-lg transition-all disabled:opacity-50"
                       >
                         {explainingId === q.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                        {explainingId === q.id ? "Đang phân tích..." : "Giải thích chi tiết bởi Trợ lí Chinhlu"}
+                        {explainingId === q.id ? "Đang phân tích..." : "Giải thích chi tiết bởi Trợ lí AI"}
                       </button>
                     )}
                   </div>

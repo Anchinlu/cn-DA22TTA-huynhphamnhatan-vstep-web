@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Upload, FileSpreadsheet, FileAudio, Save, 
-  Plus, Check, X, Layers, AlertCircle, Eye, Loader2, FileText 
+  Plus, Check, X, Layers, AlertCircle, Eye, Loader2, FileText, Bot 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Header from '../../components/Header'; 
@@ -11,20 +11,26 @@ const AdminPractice = () => {
   const [skill, setSkill] = useState('reading');
   const [level, setLevel] = useState('B1');
   const [topicId, setTopicId] = useState('');
-  const [taskType, setTaskType] = useState('task1'); // Cho Writing
-  const [part, setPart] = useState('1'); // Cho Speaking
+  const [taskType, setTaskType] = useState('task1'); 
+  const [part, setPart] = useState('1'); 
   
   // --- STATE DỮ LIỆU ---
   const [title, setTitle] = useState('');
-  
-  // Reading & Listening & Writing & Speaking
-  // content: Dùng chung cho Reading Passage, Writing Prompt, Speaking Question
+
   const [content, setContent] = useState(''); 
-  const [scriptContent, setScriptContent] = useState(''); // Kịch bản nghe (Listening)
+  const [scriptContent, setScriptContent] = useState(''); 
   
   // Upload Excel (Câu hỏi)
   const [excelFile, setExcelFile] = useState(null);
   const [questions, setQuestions] = useState([]); 
+
+  // --- STATE DỮ LIỆU BỔ SUNG ---
+  const [audioUrl, setAudioUrl] = useState(null); 
+  const [listeningMode, setListeningMode] = useState('ai'); 
+  
+  // --- STATE AI SOẠN CÂU HỎI (Chỉ cho Reading) ---
+  const [questionCount, setQuestionCount] = useState(5); 
+  const [isGenerating, setIsGenerating] = useState(false);
   
   // --- STATE HỖ TRỢ ---
   const [topics, setTopics] = useState([]);
@@ -34,7 +40,9 @@ const AdminPractice = () => {
 
   // 1. Load danh sách Chủ đề
   useEffect(() => {
-    fetch('http://localhost:5000/api/admin/topics')
+    const token = localStorage.getItem('vstep_token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    fetch('http://localhost:5000/api/admin/topics', { headers })
       .then(res => res.json())
       .then(data => setTopics(data))
       .catch(err => console.error("Lỗi load topic:", err));
@@ -44,9 +52,10 @@ const AdminPractice = () => {
   const handleAddTopic = async () => {
     if (!newTopicName.trim()) return;
     try {
+      const token = localStorage.getItem('vstep_token');
       const res = await fetch('http://localhost:5000/api/admin/topics', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: Object.assign({ 'Content-Type': 'application/json' }, token ? { Authorization: `Bearer ${token}` } : {}),
         body: JSON.stringify({ name: newTopicName })
       });
       const data = await res.json();
@@ -70,15 +79,16 @@ const AdminPractice = () => {
     setExcelFile(file);
     const formData = new FormData();
     formData.append('file', file);
-
     const loadToast = toast.loading("Đang đọc file Excel...");
     try {
+      const token = localStorage.getItem('vstep_token');
       const res = await fetch('http://localhost:5000/api/admin/preview-excel', {
         method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData
       });
       const data = await res.json();
-      
+
       if (res.ok) {
         setQuestions(data.data); 
         toast.success(`Đã đọc được ${data.total} câu hỏi!`, { id: loadToast });
@@ -88,6 +98,61 @@ const AdminPractice = () => {
     } catch (err) { toast.error("Lỗi server", { id: loadToast }); }
   };
 
+  // 1. Tải file MP3 lên Cloudinary
+  const handleAudioUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    const loadToast = toast.loading("Đang tải file âm thanh...");
+
+    try {
+      const token = localStorage.getItem('vstep_token');
+      const res = await fetch('http://localhost:5000/api/admin/upload-media', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAudioUrl(data.url);
+        toast.success("Đã tải audio thành công!", { id: loadToast });
+      } else {
+        toast.error(data.message || 'Lỗi xác thực', { id: loadToast });
+      }
+    } catch (err) { toast.error("Lỗi kết nối server", { id: loadToast }); }
+  };
+
+  // 2. AI Soạn câu hỏi (Chỉ áp dụng cho Reading)
+  const handleAIGenerate = async () => {
+    if (skill !== 'reading') return;
+    if (!content || content.length < 100) return toast.error("Nội dung bài đọc quá ngắn để AI soạn đề.");
+
+    setIsGenerating(true);
+    const loadToast = toast.loading(`AI đang soạn ${questionCount} câu hỏi Reading...`);
+
+    try {
+      const res = await fetch('http://localhost:5000/api/ai/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, type: 'reading', level, count: questionCount })
+      });
+      const data = await res.json();
+
+      if (res.status === 422) { // Logic nội dung không đủ
+        toast.error(data.message, { id: loadToast, duration: 5000 });
+      } else if (res.ok) {
+        // backend returns { questions: [...] }
+        setQuestions(data.questions || []);
+        toast.success("Đã hoàn thành soạn đề!", { id: loadToast });
+      } else {
+        toast.error(data.message || 'Lỗi Hệ thống', { id: loadToast });
+      }
+    } catch (err) { toast.error("Lỗi kết nối Hệ thống", { id: loadToast }); }
+    finally { setIsGenerating(false); }
+  };
+
   // 4. LƯU ĐỀ THI (Submit Form)
   const handleSubmit = async () => {
     if (!title || !topicId) return toast.error("Vui lòng nhập tiêu đề và chọn chủ đề");
@@ -95,9 +160,12 @@ const AdminPractice = () => {
     // Validate riêng từng kỹ năng
     if (skill === 'reading' && !content) return toast.error("Chưa nhập nội dung bài đọc!");
     if (skill === 'writing' && !content) return toast.error("Chưa nhập đề bài chi tiết!");
-    if (skill === 'speaking' && !content) return toast.error("Chưa nhập câu hỏi nói!"); // Dùng biến content làm câu hỏi Speaking
+    if (skill === 'speaking' && !content) return toast.error("Chưa nhập câu hỏi nói!"); 
     
-    if (skill === 'listening' && !scriptContent) return toast.error("Chưa nhập kịch bản (Script) cho Trợ lí Chinhlu đọc!");
+    if (skill === 'listening') {
+      if (listeningMode === 'ai' && !scriptContent) return toast.error("Chưa nhập kịch bản Script");
+      if (listeningMode === 'mp3' && !audioUrl) return toast.error("Chưa tải file MP3 lên hoặc chưa chọn file!");
+    }
     
     if ((skill === 'reading' || skill === 'listening') && questions.length === 0) return toast.error("Chưa có câu hỏi trắc nghiệm!");
 
@@ -105,12 +173,12 @@ const AdminPractice = () => {
     
     const payload = {
       title, level, topic_id: topicId,
-      questions, // Mảng câu hỏi từ Excel
+      questions,
       
       // Mapping dữ liệu
-      // Với Writing/Speaking: content chính là 'question_text' hoặc 'title' (tùy backend xử lý)
       content: (skill === 'reading' || skill === 'writing' || skill === 'speaking') ? content : null,
-      script_content: skill === 'listening' ? scriptContent : null,
+      script_content: skill === 'listening' && listeningMode === 'ai' ? scriptContent : null,
+      audio_url: skill === 'listening' && listeningMode === 'mp3' ? audioUrl : null,
       
       task_type: skill === 'writing' ? taskType : null,
       part: skill === 'speaking' ? part : null,
@@ -121,9 +189,10 @@ const AdminPractice = () => {
                      skill === 'writing' ? '/create-writing' : '/create-speaking';
 
     try {
+      const token = localStorage.getItem('vstep_token');
       const res = await fetch(`http://localhost:5000/api/admin${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: Object.assign({ 'Content-Type': 'application/json' }, token ? { Authorization: `Bearer ${token}` } : {}),
         body: JSON.stringify(payload)
       });
       const data = await res.json();
@@ -131,7 +200,7 @@ const AdminPractice = () => {
       if (res.ok) {
         toast.success(`Tạo đề ${skill.toUpperCase()} thành công!`);
         // Reset form
-        setQuestions([]); setTitle(''); setContent(''); setScriptContent(''); setExcelFile(null);
+        setQuestions([]); setTitle(''); setContent(''); setScriptContent(''); setExcelFile(null); setAudioUrl(null);
       } else {
         toast.error("Lỗi: " + (data.message || data.error));
       }
@@ -263,9 +332,24 @@ const AdminPractice = () => {
                 </select>
               )}
             </div>
-          </div>
 
-          {/* CỘT PHẢI: NỘI DUNG (2/3) */}
+            {/* Card 3:Chỉ hiện khi chọn Reading) */}
+            {skill === 'reading' && (
+              <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-6 rounded-3xl text-white shadow-lg">
+                <h3 className="font-bold mb-4 flex items-center gap-2"><Bot size={20}/> Trợ lý soạn đề AI</h3>
+                <label className="block text-xs font-bold uppercase opacity-80 mb-2">Số lượng câu: {questionCount}</label>
+                <input type="range" min="1" max="10" value={questionCount} onChange={(e) => setQuestionCount(parseInt(e.target.value))} className="w-full accent-white mb-6" />
+                <button 
+                  onClick={handleAIGenerate} 
+                  disabled={isGenerating}
+                  className="w-full py-3 bg-white text-indigo-600 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-50 transition"
+                >
+                  {isGenerating ? <Loader2 className="animate-spin" size={18}/> : <Bot size={18}/>} AI Tự soạn câu hỏi
+                </button>
+              </div>
+            )}
+
+          </div>
           <div className="lg:col-span-2 space-y-6">
             
             {/* Input Tiêu đề */}
@@ -281,18 +365,60 @@ const AdminPractice = () => {
 
             {/* KHU VỰC NỘI DUNG CHÍNH */}
             
-            {/* 1. LISTENING: Script Trợ lí Chinhlu */}
+            {/* 1. LISTENING: Linh hoạt Script hoặc MP3 */}
             {skill === 'listening' && (
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-indigo-500">
-                <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2"><FileText size={18}/> Kịch bản nghe (Script)</h3>
-                <p className="text-xs text-gray-500 mb-4">Nhập hội thoại (Man: ..., Woman: ...) để Trợ lí Chinhlu đọc.</p>
-                <textarea 
-                  rows="8"
-                  className="w-full p-4 bg-indigo-50/30 border border-indigo-100 rounded-xl outline-none font-medium text-gray-700 focus:ring-2 focus:ring-indigo-200 transition"
-                  placeholder="Man: Hello...&#10;Woman: Hi there..."
-                  value={scriptContent}
-                  onChange={(e) => setScriptContent(e.target.value)}
-                ></textarea>
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                <div className="flex bg-gray-100 p-1 rounded-2xl mb-6 w-fit">
+                   <button 
+                     onClick={() => setListeningMode('ai')} 
+                     className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${listeningMode === 'ai' ? 'bg-white text-indigo-600 shadow' : 'text-gray-400'}`}
+                   >
+                     AI Script
+                   </button>
+                   <button 
+                     onClick={() => setListeningMode('mp3')} 
+                     className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${listeningMode === 'mp3' ? 'bg-white text-indigo-600 shadow' : 'text-gray-400'}`}
+                   >
+                     File MP3
+                   </button>
+                </div>
+                
+                <div className="space-y-4">
+                  {/* Ô nhập kịch bản: Luôn hiển thị để phục vụ AI giải thích */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                      {listeningMode === 'ai' ? "Kịch bản để AI đọc (AI Voice)" : "Kịch bản để AI giải thích (Transcript)"}
+                    </label>
+                    <textarea 
+                      rows="6" 
+                      className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none font-medium focus:ring-2 ring-indigo-500 transition-all" 
+                      placeholder="Dán nội dung bài nghe vào đây..." 
+                      value={scriptContent} 
+                      onChange={(e) => setScriptContent(e.target.value)} 
+                    />
+                  </div>
+
+                  {/* Khu vực tải file MP3: Chỉ hiện khi chọn chế độ MP3 */}
+                  {listeningMode === 'mp3' && (
+                    <div className="border-2 border-dashed border-gray-200 rounded-3xl p-6 text-center relative group hover:border-indigo-300 transition-colors">
+                      <input 
+                        type="file" 
+                        accept="audio/*" 
+                        onChange={handleAudioUpload} 
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10" 
+                      />
+                      {audioUrl ? (
+                        <div className="text-green-600 font-bold flex flex-col items-center gap-2">
+                          <Check size={32}/> Đã tải file lên thành công
+                        </div>
+                      ) : (
+                        <div className="text-gray-400 flex flex-col items-center gap-2">
+                          <FileAudio size={32}/> Nhấn hoặc kéo thả file MP3
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

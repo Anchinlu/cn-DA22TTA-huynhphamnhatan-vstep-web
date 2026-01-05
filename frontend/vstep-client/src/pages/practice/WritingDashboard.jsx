@@ -121,7 +121,7 @@ const WritingDashboard = () => {
                             <PenTool className="w-8 h-8"/> Luyện Viết VSTEP
                         </h1>
                         <p className="text-indigo-100 opacity-90 max-w-lg">
-                            Chọn dạng bài và chủ đề để bắt đầu. Trợ lí Chinhlu sẽ chấm điểm và sửa lỗi chi tiết cho bạn ngay lập tức.
+                            Chọn dạng bài và chủ đề để bắt đầu. Trợ lí AI sẽ chấm điểm và sửa lỗi chi tiết cho bạn ngay lập tức.
                         </p>
                     </div>
                     <div className="absolute right-0 bottom-0 opacity-10"><PenTool size={150} /></div>

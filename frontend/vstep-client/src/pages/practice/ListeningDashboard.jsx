@@ -12,7 +12,7 @@ const ListeningDashboard = () => {
   
   // State quản lý bộ lọc
   const [selectedLevel, setSelectedLevel] = useState('B1');
-  const [selectedTopicId, setSelectedTopicId] = useState(''); // Sửa thành ID số từ DB
+  const [selectedTopicId, setSelectedTopicId] = useState(''); 
   
   // Data từ API
   const [tests, setTests] = useState([]);
@@ -26,7 +26,7 @@ const ListeningDashboard = () => {
     if (slug?.includes('giao-duc') || slug?.includes('edu')) return '📚';
     if (slug?.includes('du-lich') || slug?.includes('travel')) return '🌍';
     if (slug?.includes('cong-nghe') || slug?.includes('tech')) return '💻';
-    return '🎧'; // Icon mặc định cho Listening
+    return '🎧'; 
   };
 
   // 1. Fetch danh sách Topics từ Server (QUAN TRỌNG)
@@ -96,8 +96,6 @@ const ListeningDashboard = () => {
       
       <main className="flex-grow pt-24 pb-12 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* --- CỘT TRÁI: BỘ LỌC & DANH SÁCH ĐỀ (2/3) --- */}
           <div className="lg:col-span-2 space-y-8">
             
             {/* Header Section */}

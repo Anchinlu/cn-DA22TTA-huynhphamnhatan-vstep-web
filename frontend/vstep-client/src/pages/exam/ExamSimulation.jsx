@@ -238,7 +238,7 @@ const ExamSimulation = () => {
           return;
       }
 
-    const toastId = toast.loading("Trợ lí Chinhlu đang chấm bài, vui lòng đợi...");
+    const toastId = toast.loading("Trợ lí AI đang chấm bài, vui lòng đợi...");
 
       try {
           let lCorrect = 0;
@@ -265,8 +265,8 @@ const ExamSimulation = () => {
               for (const task of examData.writing) {
                   const text = (answers.writing[task.id] || "").toString().trim();
                   if (!text || text.length < 10) {
-                      // Nếu bỏ trống hoặc quá ngắn, bỏ qua gọi Trợ lí Chinhlu và cho 0 điểm
-                      toast("Bài viết trống hoặc quá ngắn — chấm 0 điểm (Trợ lí Chinhlu bỏ qua)");
+                      // Nếu bỏ trống hoặc quá ngắn, bỏ qua gọi Trợ lí AI và cho 0 điểm
+                      toast("Bài viết trống hoặc quá ngắn — chấm 0 điểm (Trợ lí AI bỏ qua)");
                       totalW += 0;
                       continue;
                   }
@@ -280,7 +280,7 @@ const ExamSimulation = () => {
                       })
                   });
                   if (!res.ok) {
-                      console.error('Lỗi Trợ lí Chinhlu grade-writing:', res.status);
+                      console.error('Lỗi Trợ lí AI grade-writing:', res.status);
                       totalW += 0;
                       continue;
                   }
@@ -297,7 +297,7 @@ const ExamSimulation = () => {
                   const resp = answers.speaking[part.id];
                   // Nếu chưa ghi âm (null/undefined) thì cho 0
                   if (!resp || resp === 'Chưa ghi âm') {
-                      toast("Phần nói chưa có ghi âm — chấm 0 điểm (Trợ lí Chinhlu bỏ qua)");
+                      toast("Phần nói chưa có ghi âm — chấm 0 điểm (Trợ lí AI bỏ qua)");
                       totalS += 0;
                       continue;
                   }
@@ -311,7 +311,7 @@ const ExamSimulation = () => {
                       })
                   });
                   if (!res.ok) {
-                      console.error('Lỗi Trợ lí Chinhlu grade-speaking:', res.status);
+                      console.error('Lỗi Trợ lí AI grade-speaking:', res.status);
                       totalS += 0;
                       continue;
                   }
@@ -347,7 +347,7 @@ const ExamSimulation = () => {
   };
 
   const executeNextSkill = () => {
-    window.speechSynthesis.cancel(); // QUAN TRỌNG: Tắt giọng Trợ lí Chinhlu ngay khi bấm nút
+    window.speechSynthesis.cancel(); // QUAN TRỌNG: Tắt giọng Trợ lí AI ngay khi bấm nút
       if (currentSkillIndex < 3) {
           setCurrentSkillIndex(prev => prev + 1);
           window.scrollTo(0, 0);
@@ -358,7 +358,7 @@ const ExamSimulation = () => {
   };
 
   const executeExit = () => {
-    window.speechSynthesis.cancel(); // Tắt Trợ lí Chinhlu khi thoát
+    window.speechSynthesis.cancel(); // Tắt Trợ lí AI khi thoát
       navigate('/practice');
   };
 
@@ -403,7 +403,7 @@ const ExamSimulation = () => {
          setIsTimerRunning(false);
      } else {
          setIsTimerRunning(true);
-        window.speechSynthesis.cancel(); // Phụ trợ thêm: Tắt Trợ lí Chinhlu khi đổi Index kỹ năng
+        window.speechSynthesis.cancel(); // Phụ trợ thêm: Tắt Trợ lí AI khi đổi Index kỹ năng
      }
   }, [currentSkillIndex]);
 
@@ -474,7 +474,7 @@ const ExamSimulation = () => {
                            <Headphones size={20} className="text-indigo-600"/> {examData.listening.title}
                         </h3>
                         <p className="text-sm text-gray-500 mt-1 italic">
-                            {listeningStatus === 'intro' && "Trợ lí Chinhlu đang đọc hướng dẫn (Đồng hồ đang dừng)..."}
+                            {listeningStatus === 'intro' && "Trợ lí AI đang đọc hướng dẫn (Đồng hồ đang dừng)..."}
                             {listeningStatus === 'prep' && "Thời gian đọc trước câu hỏi..."}
                             {listeningStatus === 'playing' && "Đang phát hội thoại..."}
                             {listeningStatus === 'finished' && "Đã kết thúc bài nghe."}

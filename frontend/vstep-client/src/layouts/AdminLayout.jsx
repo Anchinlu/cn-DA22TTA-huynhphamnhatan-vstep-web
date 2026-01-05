@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, School, Users, 
-  LogOut, Home, FileText,Zap // Thêm icon FileText cho đề thi
+  LogOut, Home, FileText, Zap, Database // Thêm icon Database cho Ngân hàng câu hỏi
 } from 'lucide-react';
 
 const AdminLayout = () => {
@@ -22,6 +22,7 @@ const AdminLayout = () => {
     { name: 'Quản lý Người dùng', path: '/admin/users', icon: Users },
     { name: 'Quản lý Lớp học', path: '/admin/classes', icon: School },
     { name: 'Kho đề thi', path: '/admin/create-practice', icon: FileText },
+    { name: 'Ngân hàng câu hỏi', path: '/admin/questions', icon: Database },
     { name: 'Đề Thi Thử full tacks', path: '/admin/mock-test', icon: Zap },
   ];
 

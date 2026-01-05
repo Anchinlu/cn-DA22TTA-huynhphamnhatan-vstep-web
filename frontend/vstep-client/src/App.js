@@ -40,6 +40,7 @@ import ResetPassword from './pages/ResetPassword';
 import AdminPractice from './pages/admin/AdminPractice';
 import AdminMockTest from './pages/admin/AdminMockTest';
 import ExamSimulation from './pages/exam/ExamSimulation';
+import QuestionBank from './pages/admin/QuestionBank';
 import ExamIntro from './pages/exam/ExamIntro';
 
 function App() {
@@ -103,6 +104,7 @@ function App() {
             <Route path="users" element={<UserManagement />} />
             <Route path="/admin/create-practice" element={<AdminPractice />} />
             <Route path="/admin/mock-test" element={<AdminMockTest />} />
+            <Route path="questions" element={<QuestionBank />} />
           </Route>
         </Route>
 
